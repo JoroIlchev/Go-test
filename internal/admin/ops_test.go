@@ -202,6 +202,38 @@ func TestHubAddressInDeviceLinks(t *testing.T) {
 	}
 }
 
+func TestMediaURLsBehindTunnel(t *testing.T) {
+	e := newEnv(t)
+	root := e.login("root@hub")
+	ivanov := root.mustNode(nil, "client", "Ivanov")
+	cafe := root.mustNode(p(ivanov), "site", "Cafe")
+	dev, _ := e.st.RegisterDevice(context.Background(), "uuid-t", "", "", "")
+	root.do("POST", "/api/devices/pair", map[string]any{"code": dev.PairingCode, "site_id": cafe, "name": "Bar"}, nil)
+	_, up := root.upload(cafe, "a.png", testPNG(320, 180))
+	img := root.waitReady(cafe, up[0].Media.ID, 5*time.Second)
+	var c struct{ ID int64 }
+	root.do("POST", "/api/campaigns", map[string]any{"node_id": cafe, "name": "T"}, &c)
+	spec := campaign.Spec{Items: []campaign.Item{{MediaID: img.ID, DurationS: 5}}, Targets: []int64{cafe}}
+	root.do("PUT", "/api/campaigns/"+itoa(c.ID)+"/draft", map[string]any{"name": "T", "spec": spec}, nil)
+	root.do("POST", "/api/campaigns/"+itoa(c.ID)+"/publish", nil, nil)
+
+	ph := httptest.NewServer(player.New(e.st, mustStorage(e), slog.New(slog.NewTextHandler(io.Discard, nil)), player.Config{RefreshSec: 900}))
+	defer ph.Close()
+	req, _ := http.NewRequest("GET", ph.URL+"/p/index.smil", nil)
+	req.Host = "abc.trycloudflare.com" // what cloudflared passes on
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("User-Agent", "GAPI/1.0 (UUID:uuid-t; NAME:x) player/1.0 (MODEL:box)")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if want := "https://abc.trycloudflare.com/m/" + img.SHA256; !strings.Contains(string(b), want) {
+		t.Fatalf("want %s in:\n%s", want, b)
+	}
+}
+
 func mustNodePtr(t *testing.T, e *env, id int64) *store.Node {
 	n, err := e.st.Node(context.Background(), id)
 	if err != nil {

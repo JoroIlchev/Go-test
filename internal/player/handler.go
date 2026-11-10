@@ -271,7 +271,9 @@ func requestBase(r *http.Request, fallback string) string {
 		return fallback
 	}
 	scheme := "http"
-	if r.TLS != nil {
+	// A tunnel or reverse proxy (cloudflared, nginx) ends TLS itself and says so
+	// here. Trusting it is harmless: a liar only gets https links it cannot use.
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
