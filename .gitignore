@@ -1,0 +1,7 @@
+marquee*.exe
+data/
+data-*/
+*.log
+web/node_modules/
+tools/
+marquee*.exe~

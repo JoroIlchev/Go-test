@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<title>marquee — Сглобяване, инсталиране и стартиране</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section class="cover">
+  <h1>marquee</h1>
+  <div class="sub">Сглобяване, инсталиране и стартиране</div>
+  <p>Как се сглобява <code>marquee.exe</code> от кода, как се пуска първия път, всички команди и настройки от командния ред,
+  работа като Windows услуга, мрежа, обновяване, резервни копия и възстановяване.</p>
+  <p class="meta">Версия на документа: 10.11.2026</p>
+</section>
+
+<h2>Съдържание</h2>
+<ol class="toc">
+  <li>Как е устроена системата</li>
+  <li>Какво е нужно за сглобяване</li>
+  <li>Структура на проекта</li>
+  <li>Сглобяване на marquee.exe</li>
+  <li>Тестове</li>
+  <li>Разработка на интерфейса</li>
+  <li>Какво се копира на сървъра</li>
+  <li>Първо стартиране</li>
+  <li>Команди</li>
+  <li>Настройки от командния ред (флагове)</li>
+  <li>Мрежа: портове, рутер, защитна стена</li>
+  <li>Работа като Windows услуга</li>
+  <li>HTTPS и достъп до админа отвън</li>
+  <li>Обновяване до нова версия</li>
+  <li>Папката с данни</li>
+  <li>Резервни копия и възстановяване</li>
+  <li>Логове</li>
+  <li>Отстраняване на проблеми</li>
+</ol>
+
+<h2>1. Как е устроена системата</h2>
+<p>marquee е <b>един файл</b> <code>marquee.exe</code>. В него са сървърът (Go) и админ интерфейсът (React), вграден при сглобяването.
+Не е нужна отделна база данни, уеб сървър или runtime: базата е SQLite файл в папката с данни.</p>
+<table>
+  <tr><th style="width:32%">Слуша на</th><th>За какво</th></tr>
+  <tr><td><code>:8080</code> (всички мрежови карти)</td><td>Устройствата: SMIL разписания (<code>/p/…</code>, <code>/d/…</code>) и медийни файлове (<code>/m/…</code>).</td></tr>
+  <tr><td><code>127.0.0.1:8081</code> (само тази машина)</td><td>Админ панелът и неговото API.</td></tr>
+  <tr><td><code>:443</code> и <code>:80</code></td><td>Само с <code>-domain</code> или <code>-cert</code>: HTTPS за устройствата и (по избор) за админа.</td></tr>
+</table>
+<p>Външни програми: <b>ffmpeg</b> и <b>ffprobe</b> за проверка, миниатюри, конвертиране на видео и „Видео от снимки“. Без тях системата
+работи, но видеата не се проверяват и не се правят видеа от снимки.</p>
+
+<h2>2. Какво е нужно за сглобяване</h2>
+<table>
+  <tr><th style="width:26%">Програма</th><th style="width:20%">Версия</th><th>Инсталиране</th></tr>
+  <tr><td>Go</td><td>1.27 или по-нова</td><td><code>winget install --source winget GoLang.Go</code></td></tr>
+  <tr><td>Node.js (с npm)</td><td>24 или по-нова</td><td><code>winget install --source winget OpenJS.NodeJS.LTS</code></td></tr>
+  <tr><td>ffmpeg (essentials)</td><td>7 или по-нова</td><td><code>winget install --source winget Gyan.FFmpeg.Essentials</code></td></tr>
+  <tr><td>Git</td><td>по желание</td><td><code>winget install --source winget Git.Git</code></td></tr>
+</table>
+<div class="note"><p>След инсталиране отворете <b>нов</b> прозорец на PowerShell, за да се зареди новият PATH.</p></div>
+<p>Сглобяването не изисква C компилатор: SQLite е чист Go (modernc.org/sqlite).</p>
+
+<h2>3. Структура на проекта</h2>
+<div class="tree">marquee\
+├── cmd\marquee\        стартиране, команди, HTTPS, Windows услуга
+├── internal\
+│   ├── admin\          API на админ панела
+│   ├── auth\           пароли, сесии, права
+│   ├── campaign\       кампании и генериране на SMIL
+│   ├── logx\           четим лог, файл на ден
+│   ├── media\          качване, ffmpeg, конвертиране, видео от снимки
+│   ├── ops\            мониторинг, имейли, резервни копия, таксуване, адрес на хъба
+│   ├── player\         всичко, което устройствата теглят
+│   ├── poll\           график на проверките
+│   ├── schedule\       разписания (дни, часове, приоритети)
+│   └── store\          базата данни (SQLite) и миграциите
+├── web\                админ интерфейсът (React + TypeScript + Vite)
+│   ├── src\            код
+│   └── dist\           сглобеният интерфейс (вгражда се в exe-то)
+├── tools\              ffmpeg.exe, ffprobe.exe (не са в git)
+├── docs\               тези документи (src\ = HTML източници)
+└── data\               данни при работа (не са в git)</div>
+
+<h2>4. Сглобяване на marquee.exe</h2>
+<p>Интерфейсът се сглобява <b>първи</b>, защото Go вгражда готовата папка <code>web\dist</code> в exe-то.</p>
+<pre><code>cd C:\Users\&lt;потребител&gt;\projects\marquee
+
+# 1. Интерфейс (първия път и при промяна на зависимостите: npm install)
+cd web
+npm install
+npm run build          # проверка на типовете + сглобяване в web\dist
+cd ..
+
+# 2. Сървър с вградения интерфейс
+go build -o marquee.exe ./cmd/marquee</code></pre>
+<p>Ако <code>marquee.exe</code> в момента работи, Windows не позволява да се презапише. Тогава сглобете под друго име и го заменете
+при спрян marquee (раздел 14):</p>
+<pre><code>go build -o marquee-new.exe ./cmd/marquee</code></pre>
+<h3>По-малък файл и версия за Linux</h3>
+<pre><code>go build -ldflags "-s -w" -o marquee.exe ./cmd/marquee      # без дебъг информация
+
+$env:GOOS="linux"; $env:GOARCH="amd64"
+go build -o marquee ./cmd/marquee                           # Linux сървър
+Remove-Item Env:GOOS, Env:GOARCH</code></pre>
+<p>За Linux няма Windows услуга (използвайте systemd), а шрифтовете за текст върху снимки трябва да се сложат в <code>tools/fonts</code>.</p>
+
+<h2>5. Тестове</h2>
+<pre><code>go vet ./...
+go test ./...
+
+# тестовете с истински ffmpeg се пропускат, ако ffmpeg не е в PATH:
+$env:PATH = "$PWD\tools;$env:PATH"
+go test ./... -count=1</code></pre>
+<p>Тестовете покриват правата и изолацията между клиенти, качване и конвертиране, видео от снимки (с истинско рендиране), кампании и
+одобрения до SMIL на устройството, графици (вкл. смяна на часовото време), мониторинг с тестов пощенски сървър, резервни копия,
+таксуване и HTTPS със самоподписан сертификат.</p>
+
+<h2>6. Разработка на интерфейса</h2>
+<p>За бърза работа по интерфейса без пресглобяване на exe-то:</p>
+<pre><code># прозорец 1: сървърът
+.\marquee.exe
+
+# прозорец 2: интерфейсът с автоматично презареждане
+cd web
+npm run dev            # отваря http://localhost:5173, /api се препраща към :8081</code></pre>
+<p>Проверка на типовете без сглобяване: <code>npm run typecheck</code>.</p>
+
+<h2>7. Какво се копира на сървъра</h2>
+<div class="tree">C:\marquee\
+├── marquee.exe
+└── tools\
+    ├── ffmpeg.exe
+    └── ffprobe.exe</div>
+<p>Това е всичко. Папката <code>data\</code> се създава сама при първото стартиране, до exe-то. ffmpeg може да се вземе от
+<code>C:\Users\&lt;потребител&gt;\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials…\ffmpeg-…\bin\</code> или от gyan.dev.
+marquee търси ffmpeg в този ред: флаг <code>-tools</code>, папка <code>tools\</code> до exe-то, PATH.</p>
+<p>Шрифтовете за текст върху снимки се взимат от <code>C:\Windows\Fonts</code> (Arial, Segoe UI, Impact, Verdana, Georgia, Comic Sans).
+Ако липсват, сложете ги в <code>tools\fonts\</code>.</p>
+
+<h2>8. Първо стартиране</h2>
+<ol class="steps">
+  <li><b>Създайте супер админ</b> (само първия път). Паролата се пита два пъти и не се вижда; поне 10 символа.
+<pre><code>.\marquee.exe create-super -email ti@firma.bg -name "Георги"</code></pre></li>
+  <li><b>Пуснете хъба</b>:
+<pre><code>.\marquee.exe</code></pre>
+  В конзолата (и в <code>data\logs</code>) се вижда къде слуша и <b>адресът за устройствата</b>.</li>
+  <li><b>Отворете админа</b> на <code>http://127.0.0.1:8081</code> и влезте.</li>
+  <li><b>Настройки → Адрес на хъба</b>: въведете статичния публичен IP, ако устройствата са извън локалната мрежа.</li>
+  <li>Спиране: <b>Ctrl+C</b> в прозореца.</li>
+</ol>
+<div class="warn"><p>Програмата приема само флагове. Дума без тире (напр. <code>marquee.exe serve</code>) спира старта с грешка,
+за да не се пренебрегнат тихо следващите флагове.</p></div>
+
+<h2>9. Команди</h2>
+<table>
+  <tr><th style="width:40%">Команда</th><th>Какво прави</th></tr>
+  <tr><td><code>marquee.exe [флагове]</code></td><td>Стартира хъба (раздел 10 за флаговете).</td></tr>
+  <tr><td><code>marquee.exe -h</code></td><td>Списък на флаговете.</td></tr>
+  <tr><td><code>marquee.exe create-super -email … [-name …] [-data …]</code></td><td>Създава супер админ. Може да се пусне и докато хъбът работи.</td></tr>
+  <tr><td><code>marquee.exe install-service [флагове]</code></td><td>Инсталира и стартира Windows услуга с тези флагове (раздел 12). Като администратор.</td></tr>
+  <tr><td><code>marquee.exe uninstall-service</code></td><td>Спира и маха услугата и правилото в защитната стена. Данните остават.</td></tr>
+</table>
+<p>Паролата за <code>create-super</code> може да се подаде и през pipe (напр. при автоматизация):
+<code>"парола-от-поне-10" | .\marquee.exe create-super -email ti@firma.bg</code>.</p>
+
+<h2>10. Настройки от командния ред (флагове)</h2>
+<table>
+  <tr><th style="width:24%">Флаг</th><th style="width:22%">По подразбиране</th><th>Описание</th></tr>
+  <tr><td><code>-addr</code></td><td><code>:8080</code></td><td>HTTP адрес за устройствата. <code>""</code> = изключен (тогава устройствата ползват само HTTPS).</td></tr>
+  <tr><td><code>-admin-addr</code></td><td><code>127.0.0.1:8081</code></td><td>Адрес на админ панела. По подразбиране само от тази машина. <code>""</code> = изключен.</td></tr>
+  <tr><td><code>-data</code></td><td><code>data\</code> до exe-то</td><td>Папка за базата, файловете, логовете и копията.</td></tr>
+  <tr><td><code>-public-url</code></td><td>(празно)</td><td>Фиксира адреса на хъба в линковете на устройствата и заключва полето в Настройки.
+  Празно = от Настройки, иначе IP-то на машината.</td></tr>
+  <tr><td><code>-tools</code></td><td><code>tools\</code> до exe-то</td><td>Папка с ffmpeg.exe и ffprobe.exe.</td></tr>
+  <tr><td><code>-max-upload-mb</code></td><td><code>4096</code></td><td>Максимален размер на един качван файл, MB.</td></tr>
+  <tr><td><code>-tz</code></td><td><code>Europe/Sofia</code></td><td>Часова зона на разписанията.</td></tr>
+  <tr><td><code>-refresh</code></td><td><code>15m</code></td><td>Колко често проверяват екраните, ако звеното няма свой график (напр. <code>5m</code>, <code>1h</code>; минимум 1m).</td></tr>
+  <tr><td><code>-domain</code></td><td>(празно)</td><td>Домейн: включва HTTPS с безплатен сертификат от Let's Encrypt (раздел 13).</td></tr>
+  <tr><td><code>-acme-email</code></td><td>(празно)</td><td>Имейл, на който Let's Encrypt пише при проблем със сертификата.</td></tr>
+  <tr><td><code>-cert</code>, <code>-key</code></td><td>(празно)</td><td>Собствен сертификат и ключ (PEM) вместо Let's Encrypt.</td></tr>
+  <tr><td><code>-https-addr</code></td><td><code>:443</code></td><td>HTTPS адрес (с <code>-domain</code> или <code>-cert</code>).</td></tr>
+  <tr><td><code>-http-addr</code></td><td><code>:80</code></td><td>HTTP адрес за проверка на сертификата и пренасочване към HTTPS.</td></tr>
+  <tr><td><code>-public-admin</code></td><td>изключено</td><td>Админ панелът и през HTTPS отвън. Изисква <code>-domain</code> или <code>-cert</code>.</td></tr>
+</table>
+<p>Примери:</p>
+<pre><code># обикновено пускане
+.\marquee.exe
+
+# друга папка с данни и проверки на всеки 5 минути
+.\marquee.exe -data D:\marquee-data -refresh 5m
+
+# фиксиран адрес за устройствата
+.\marquee.exe -public-url http://85.10.20.30:8080</code></pre>
+
+<h2>11. Мрежа: портове, рутер, защитна стена</h2>
+<p>Устройствата трябва да стигат до порт <b>8080 (TCP)</b> на машината.</p>
+<ul>
+  <li><b>Устройства в същата локална мрежа:</b> адресът е IP-то на машината (напр. <code>http://192.168.1.20:8080</code>). Нужно е само правило в защитната стена.</li>
+  <li><b>Устройства на други обекти по интернет:</b> на рутера пренасочете външен порт 8080 (TCP) към вътрешния IP на машината, порт 8080.
+  В Настройки → Адрес на хъба въведете статичния публичен IP.</li>
+  <li>Машината трябва да има постоянен вътрешен IP (резервиран в рутера или статичен), иначе пренасочването спира да работи.</li>
+</ul>
+<h3>Защитна стена на Windows</h3>
+<p><code>install-service</code> добавя правило автоматично. При ръчно пускане Windows пита при първото стартиране (натиснете
+„Разреши“), или добавете правило ръчно като администратор:</p>
+<pre><code>New-NetFirewallRule -DisplayName "marquee" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow</code></pre>
+<h3>Проверка</h3>
+<p>От друг компютър или телефон отворете <code>http://&lt;IP&gt;:8080/p/pair.html</code>. Отговор „404“ означава, че хъбът се достига
+(страницата е само за устройства). Ако няма отговор, проблемът е в мрежата.</p>
+<div class="note"><p>Админ панелът (<code>:8081</code>) е достъпен само от самата машина. Това е нарочно: без HTTPS паролата би минавала некриптирано.
+За достъп отвън вижте раздел 13.</p></div>
+
+<h2>12. Работа като Windows услуга</h2>
+<p>Като услуга marquee тръгва автоматично с Windows (без да се влиза в профил), рестартира се сам при срив (до 3 пъти на ден, през 10 сек)
+и пише лога в <code>data\logs</code>.</p>
+<pre><code># PowerShell като администратор, в папката на exe-то
+.\marquee.exe install-service                                  # с настройките по подразбиране
+.\marquee.exe install-service -refresh 10m -data D:\marquee-data  # със свои флагове
+
+Get-Service marquee           # състояние
+Stop-Service marquee
+Start-Service marquee
+Restart-Service marquee
+
+.\marquee.exe uninstall-service   # махане; данните остават</code></pre>
+<ul>
+  <li>Пътищата във флаговете трябва да са пълни (<code>D:\…</code>), защото услугата стартира в <code>C:\Windows\System32</code>.</li>
+  <li>За смяна на флаговете: <code>uninstall-service</code>, после <code>install-service</code> с новите.</li>
+  <li>Услугата работи като LocalSystem. Мрежова папка за резервни копия трябва да е с пълен UNC път (<code>\\сървър\папка</code>) и
+  достъпна за компютърния акаунт; мапнатите букви (Z:) не се виждат от услугата.</li>
+  <li>Инсталирането като услуга още не е изпробвано на живо: проверете с <code>Get-Service marquee</code> и логовете.</li>
+</ul>
+
+<h2>13. HTTPS и достъп до админа отвън</h2>
+<p>Без домейн системата работи по HTTP на IP: устройствата се свързват, а админът е само локален. HTTPS е нужен, ако искате
+админ панела отвън.</p>
+<h3>С домейн и Let's Encrypt (безплатно, автоматично)</h3>
+<ol class="steps">
+  <li>Домейн, насочен към публичния IP. Подходящ е и безплатен (напр. DuckDNS).</li>
+  <li>Пренасочени портове <b>80 и 443</b> на рутера към машината, правила в защитната стена.</li>
+  <li>Пускане:
+<pre><code>.\marquee.exe -domain ads.firma.bg -acme-email ti@firma.bg -public-admin</code></pre></li>
+</ol>
+<p>Сертификатът се взима при първата HTTPS заявка и се подновява сам; пази се в <code>data\certs</code>. Android 7.1.1 приема сертификатите на
+Let's Encrypt. С <code>-public-admin</code> логин страницата е на <code>https://ads.firma.bg/</code>. Без него отвън се виждат само екраните.
+Устройствата могат да ползват и <code>http://</code>, и <code>https://</code> адреси.</p>
+<h3>Със собствен сертификат</h3>
+<pre><code>.\marquee.exe -cert C:\certs\hub.pem -key C:\certs\hub-key.pem -public-admin</code></pre>
+<div class="warn"><p>Let's Encrypt не издава сертификати за голи IP адреси, затова HTTPS изисква домейн или собствен сертификат.</p></div>
+
+<h2>14. Обновяване до нова версия</h2>
+<h3>При ръчно пускане</h3>
+<pre><code># 1. сглобете новата версия под друго име (старата може да работи)
+go build -o marquee-new.exe ./cmd/marquee
+
+# 2. спрете marquee (Ctrl+C), заменете и пуснете отново
+Move-Item -Force marquee-new.exe marquee.exe
+.\marquee.exe</code></pre>
+<h3>При услуга</h3>
+<pre><code>Stop-Service marquee
+Move-Item -Force marquee-new.exe marquee.exe
+Start-Service marquee</code></pre>
+<p>След обновяване натиснете <b>Ctrl+F5</b> в браузъра, за да се зареди новият интерфейс. Промените по базата (миграции) се прилагат
+автоматично при старт. Препоръчително е преди обновяване да направите копие от Настройки → <span class="ui">Направи копие сега</span>.</p>
+
+<h2>15. Папката с данни</h2>
+<div class="tree">data\
+├── marquee.db            базата: клиенти, потребители, устройства, кампании, настройки
+├── marquee.db-wal, -shm  временни файлове на базата (не се трият ръчно, докато работи)
+├── media\
+│   ├── ab\abcd….jpg      качените файлове, именувани по съдържанието си
+│   ├── thumbs\           миниатюри
+│   └── tmp\              временни файлове при качване и обработка
+├── logs\                 marquee-ГГГГ-ММ-ДД.log, по един на ден, 90 дни
+├── backups\              резервни копия (ако не е избрана друга папка)
+└── certs\                HTTPS сертификати (само с -domain)</div>
+<p>Цялото състояние на системата е в тази папка. Рестартът на машината или програмата не губи нищо.</p>
+
+<h2>16. Резервни копия и възстановяване</h2>
+<p>Автоматично всяка нощ (по подразбиране 03:00), настройва се в Настройки. Всяко копие е <code>marquee-ГГГГММДД-ЧЧММСС.db</code> плюс
+папка <code>media</code> с всички файлове. Копието на базата се прави без спиране на хъба.</p>
+<h3>Възстановяване</h3>
+<ol class="steps">
+  <li>Спрете marquee (Ctrl+C или <code>Stop-Service marquee</code>).</li>
+  <li>Преименувайте текущата <code>data\marquee.db</code> (за всеки случай) и изтрийте <code>marquee.db-wal</code> и <code>marquee.db-shm</code>.</li>
+  <li>Копирайте избраното <code>marquee-….db</code> като <code>data\marquee.db</code>.</li>
+  <li>Копирайте папката <code>media</code> от копието върху <code>data\media</code> (липсващите файлове).</li>
+  <li>Пуснете marquee.</li>
+</ol>
+<h3>Преместване на друга машина</h3>
+<p>Копирайте <code>marquee.exe</code>, <code>tools\</code> и цялата папка <code>data\</code> (при спрян marquee). На новата машина сменете адреса
+на хъба в Настройки, ако IP-то е друго. При личните линкове смяната на IP изисква нов адрес на устройствата.</p>
+
+<h2>17. Логове</h2>
+<p>Файлове <code>data\logs\marquee-ГГГГ-ММ-ДД.log</code>, четими с Notepad, или в админа: меню <span class="ui">Логове</span>. Формат:</p>
+<pre><code>2026-11-10 15:36:37  ИНФО      Слуша за устройства                      адрес=:8080
+2026-11-10 15:36:37  ИНФО      Адрес за устройствата                    адрес=http://85.10.20.30:8080
+2026-11-10 15:35:41  ИНФО      Ново устройство чака свързване           код=STZB2B име=Vitrina ip=10.0.0.15
+2026-11-10 15:35:42  ВНИМАНИЕ  Неуспешен вход                           имейл=nobody@x.bg ip=127.0.0.1</code></pre>
+<p>Нива: <b>ИНФО</b> (нормални събития), <b>ВНИМАНИЕ</b> (нещо за проверка), <b>ГРЕШКА</b> (нещо не е станало). При ръчно пускане
+същите редове се виждат и в конзолата.</p>
+
+<h2>18. Отстраняване на проблеми</h2>
+<table>
+  <tr><th style="width:36%">Симптом</th><th>Причина и решение</th></tr>
+  <tr><td><code>bind: Only one usage of each socket address</code></td><td>Портът е зает: вече работи друг marquee (или друга програма). Спрете го или сменете <code>-addr</code> / <code>-admin-addr</code>.</td></tr>
+  <tr><td><code>The process cannot access the file</code> при сглобяване</td><td><code>marquee.exe</code> работи. Сглобете като <code>marquee-new.exe</code> (раздел 14).</td></tr>
+  <tr><td>„Няма ffmpeg“ в лога</td><td>Сложете <code>ffmpeg.exe</code> и <code>ffprobe.exe</code> в <code>tools\</code> до exe-то или задайте <code>-tools</code>.</td></tr>
+  <tr><td>Адресът за устройствата е вътрешен</td><td>Въведете публичния IP в Настройки → Адрес на хъба. Пренасочете порт 8080 на рутера.</td></tr>
+  <tr><td>Новият интерфейс не се вижда</td><td>Ctrl+F5 в браузъра. Проверете, че е пуснат новият exe (бил ли е спрян старият).</td></tr>
+  <tr><td>Входът не става след <code>create-super</code> през pipe в PowerShell 5.1</td><td>Оправено: marquee маха невидимия BOM символ. Ако все пак не стане, създайте потребителя интерактивно (без pipe).</td></tr>
+  <tr><td>Услугата не тръгва</td><td>Вижте <code>data\logs</code> и Event Viewer → Windows Logs → System. Чести причини: относителен път във флаг, зает порт.</td></tr>
+  <tr><td>Let's Encrypt не издава сертификат</td><td>Домейнът не сочи към машината или порт 80/443 не е пренасочен. Подробности в лога.</td></tr>
+</table>
+
+</body>
+</html>

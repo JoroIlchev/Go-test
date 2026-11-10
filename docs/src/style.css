@@ -1,0 +1,34 @@
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+:root { --accent: #2f5bd3; --muted: #5d6573; --border: #d8dce3; --soft: #f3f5f9; --warn: #fff6e0; --warn-b: #e8b23a; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1d222b; margin: 0; }
+h1 { font-size: 24pt; margin: 0 0 4mm; color: var(--accent); }
+h2 { font-size: 15pt; margin: 9mm 0 3mm; padding-bottom: 1.5mm; border-bottom: 2px solid var(--accent); break-after: avoid; }
+h3 { font-size: 12pt; margin: 6mm 0 2mm; break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 4mm 0 1mm; break-after: avoid; }
+p { margin: 0 0 2.5mm; }
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1mm; }
+code, .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 9.5pt; }
+code { background: var(--soft); padding: 0 1.2mm; border-radius: 1mm; }
+pre { background: #1f2430; color: #e8ebf1; padding: 3mm 4mm; border-radius: 2mm; font-size: 9pt; line-height: 1.45; white-space: pre-wrap; break-inside: avoid; margin: 0 0 3mm; }
+pre code { background: none; padding: 0; color: inherit; }
+table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9.5pt; break-inside: auto; }
+th, td { border: 1px solid var(--border); padding: 1.6mm 2.2mm; text-align: left; vertical-align: top; }
+th { background: var(--soft); }
+tr { break-inside: avoid; }
+.ui { font-weight: 600; color: #233a8a; }
+.note, .warn, .tip { border-left: 4px solid var(--accent); background: var(--soft); padding: 2.5mm 4mm; margin: 0 0 4mm; border-radius: 0 2mm 2mm 0; break-inside: avoid; }
+.warn { border-color: var(--warn-b); background: var(--warn); }
+.tip { border-color: #2e9d5b; background: #eef8f1; }
+.note > :last-child, .warn > :last-child, .tip > :last-child { margin-bottom: 0; }
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+.cover .sub { font-size: 14pt; color: var(--muted); margin-bottom: 12mm; }
+.cover .meta { color: var(--muted); font-size: 10pt; }
+.toc { columns: 2; column-gap: 10mm; font-size: 10pt; }
+.toc li { break-inside: avoid; }
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li { counter-increment: step; position: relative; padding-left: 9mm; margin-bottom: 2.5mm; }
+.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0.2mm; width: 6mm; height: 6mm; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; }
+.tree { font-family: Consolas, monospace; font-size: 9.5pt; background: var(--soft); padding: 3mm 4mm; border-radius: 2mm; white-space: pre; line-height: 1.45; margin-bottom: 3mm; break-inside: avoid; }
+.page-break { break-before: page; }
