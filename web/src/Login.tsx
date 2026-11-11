@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Logo } from "./Logo";
 import { api, errorText, type User } from "./api";
 
 export function Login({ onLogin }: { onLogin: (u: User) => void }) {
@@ -23,7 +24,7 @@ export function Login({ onLogin }: { onLogin: (u: User) => void }) {
   return (
     <div className="login-wrap">
       <form className="card login" onSubmit={submit}>
-        <h1 className="brand">marquee</h1>
+        <h1 className="brand"><Logo size={40} /></h1>
         <label>
           Имейл
           <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />

@@ -11,6 +11,8 @@ import (
 	"net/mail"
 	"strings"
 
+	"marquee/internal/media"
+	"marquee/internal/poll"
 	"marquee/internal/store"
 )
 
@@ -33,12 +35,20 @@ type Settings struct {
 	BackupTime string `json:"backup_time"` // "HH:MM" local, "" = off
 	BackupKeep int    `json:"backup_keep"` // database copies kept
 	BackupDir  string `json:"backup_dir"`  // "" = data\backups
+
+	// Processing of new uploads (see media.Options).
+	ImageScreen  string `json:"image_screen"`  // "1920x1080", "1080x1920", "3840x2160" or "off"
+	ImageQuality string `json:"image_quality"` // high | normal | small
+	VideoAuto    string `json:"video_auto"`    // off | problems | always
+	VideoMax     int    `json:"video_max"`     // 1080 | 720
+	VideoQuality string `json:"video_quality"` // high | normal | small
 }
 
 const settingsKey = "hub"
 
 func Defaults() Settings {
-	return Settings{SMTPPort: 587, AlertGraceMin: 10, BackupTime: "03:00", BackupKeep: 14, AlertEmails: []string{}}
+	return Settings{SMTPPort: 587, AlertGraceMin: 10, BackupTime: "03:00", BackupKeep: 14, AlertEmails: []string{},
+		ImageScreen: "1920x1080", ImageQuality: "normal", VideoAuto: "problems", VideoMax: 1080, VideoQuality: "normal"}
 }
 
 func Load(ctx context.Context, st *store.Store) (Settings, error) {
@@ -106,7 +116,71 @@ func (s *Settings) Normalize(prev Settings) error {
 		return errors.New("keep 1..365 backups")
 	}
 	s.BackupDir = strings.TrimSpace(s.BackupDir)
-	return nil
+	def := Defaults()
+	if s.ImageScreen == "" {
+		s.ImageScreen = def.ImageScreen
+	}
+	if s.ImageQuality == "" {
+		s.ImageQuality = def.ImageQuality
+	}
+	if s.VideoAuto == "" {
+		s.VideoAuto = def.VideoAuto
+	}
+	if s.VideoMax == 0 {
+		s.VideoMax = def.VideoMax
+	}
+	if s.VideoQuality == "" {
+		s.VideoQuality = def.VideoQuality
+	}
+	_, err := s.mediaOptions()
+	return err
+}
+
+// MediaOptions is how the worker prepares new uploads; invalid stored values
+// fall back to the defaults.
+func (s Settings) MediaOptions() media.Options {
+	o, err := s.mediaOptions()
+	if err != nil {
+		o, _ = Defaults().mediaOptions()
+	}
+	return o
+}
+
+func (s Settings) mediaOptions() (media.Options, error) {
+	return s.Prep().Options()
+}
+
+// Prep is the default processing choice offered in the media library.
+func (s Settings) Prep() media.Prep {
+	return media.Prep{ImageScreen: s.ImageScreen, ImageQuality: s.ImageQuality, VideoAuto: s.VideoAuto,
+		VideoMax: s.VideoMax, VideoQuality: s.VideoQuality}
 }
 
 func (s Settings) MailConfigured() bool { return s.SMTPHost != "" && s.SMTPFrom != "" }
+
+const defaultPollKey = "default_poll"
+
+// DefaultPoll is how often devices check when no node above them has its
+// own schedule: the one set in the hub settings, else fallback (-refresh).
+// own reports whether the settings define it.
+func DefaultPoll(ctx context.Context, st *store.Store, fallback poll.Policy) (p poll.Policy, own bool) {
+	raw, err := st.Setting(ctx, defaultPollKey)
+	if err != nil || raw == "" {
+		return fallback, false
+	}
+	if err := json.Unmarshal([]byte(raw), &p); err != nil || p.Normalize() != nil {
+		return fallback, false
+	}
+	return p, true
+}
+
+// SetDefaultPoll stores the hub-wide schedule; nil returns to the fallback.
+func SetDefaultPoll(ctx context.Context, st *store.Store, p *poll.Policy) error {
+	if p == nil {
+		return st.SetSetting(ctx, defaultPollKey, "")
+	}
+	if err := p.Normalize(); err != nil {
+		return err
+	}
+	return st.SetSetting(ctx, defaultPollKey, p.JSON())
+}

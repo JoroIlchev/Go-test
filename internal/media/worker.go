@@ -25,13 +25,19 @@ type Worker struct {
 	tools   Tools
 	log     *slog.Logger
 	queue   chan int64
+	options func(context.Context) Options
 }
 
 func NewWorker(st *store.Store, storage *Storage, tools Tools, log *slog.Logger) *Worker {
-	return &Worker{store: st, storage: storage, tools: tools, log: log, queue: make(chan int64, 10000)}
+	return &Worker{store: st, storage: storage, tools: tools, log: log, queue: make(chan int64, 10000),
+		options: func(context.Context) Options { return DefaultOptions() }}
 }
 
 func (w *Worker) Tools() Tools { return w.tools }
+
+// SetOptions makes the worker read the processing options from f for every
+// file, so a change in the settings applies to the next upload.
+func (w *Worker) SetOptions(f func(context.Context) Options) { w.options = f }
 
 // Enqueue schedules a media item; it never blocks the caller.
 func (w *Worker) Enqueue(id int64) {
@@ -79,12 +85,130 @@ func (w *Worker) process(ctx context.Context, id int64) error {
 	if m.SHA256 == "" && m.SourceID.Valid {
 		return w.convert(ctx, m)
 	}
-	return w.inspect(ctx, m)
+	return w.inspect(ctx, m, true)
 }
 
-func (w *Worker) inspect(ctx context.Context, m *store.Media) error {
+// inspect probes the item's file and marks it ready. For a fresh upload
+// (prepare) it first applies the processing options: images larger than the
+// screen are shrunk, videos are converted in place when the settings say so.
+func (w *Worker) inspect(ctx context.Context, m *store.Media, prepare bool) error {
 	path := w.storage.Path(m.SHA256, m.Ext)
-	p := store.MediaProbe{SHA256: m.SHA256, Size: m.Size}
+	upload := prepare && !m.SourceID.Valid && m.Recipe == ""
+	opts := w.optionsFor(ctx, m)
+
+	switch m.Kind {
+	case "image":
+		wd, ht, err := ImageSize(path)
+		if err != nil {
+			return fmt.Errorf("Файлът не е валидно изображение: %v", err)
+		}
+		if upload && !opts.fits(wd, ht) && w.tools.FFmpeg != "" {
+			old := *m
+			if err := w.shrinkImage(ctx, m, opts); err != nil {
+				w.log.Warn("Снимката не можа да се смали; остава оригиналът", "снимка", m.Name, "грешка", err)
+				return w.inspectWith(ctx, m)
+			}
+			note := Warning{Level: "info", Code: "resized",
+				Message: fmt.Sprintf("Смалена от %d×%d (%s), за да се побере в екран %d×%d.", wd, ht, formatSize(old.Size), opts.ImageW, opts.ImageH)}
+			if err := w.inspectWith(ctx, m, note); err != nil {
+				return err
+			}
+			w.log.Info("Снимката е смалена", "снимка", m.Name, "беше", fmt.Sprintf("%d×%d", wd, ht))
+			w.dropUnused(ctx, &old)
+			return nil
+		}
+		return w.inspectWith(ctx, m)
+	case "video":
+		if upload && opts.VideoAuto != "off" && w.tools.FFmpeg != "" {
+			r, err := w.tools.Probe(ctx, path)
+			if err == nil && (opts.VideoAuto == "always" || Convertible("video", CheckVideo(m.Ext, r))) {
+				w.log.Info("Автоматично конвертиране на видео", "видео", m.Name)
+				out, err := w.encode(ctx, path, r.Height > r.Width, opts)
+				if err != nil {
+					return fmt.Errorf("автоматичното конвертиране не успя: %w", err)
+				}
+				defer os.Remove(out)
+				old := *m
+				if err := w.replace(m, out, "mp4"); err != nil {
+					return err
+				}
+				note := Warning{Level: "info", Code: "converted",
+					Message: fmt.Sprintf("Конвертирано автоматично за плейърите (оригинал: %s, %s).", strings.ToUpper(old.Ext), formatSize(old.Size))}
+				if err := w.inspectWith(ctx, m, note); err != nil {
+					return err
+				}
+				w.dropUnused(ctx, &old)
+				return nil
+			}
+		}
+	}
+	return w.inspectWith(ctx, m)
+}
+
+// optionsFor is how m is prepared: the choice made when it was uploaded,
+// else the hub settings.
+func (w *Worker) optionsFor(ctx context.Context, m *store.Media) Options {
+	if m.Prep != "" {
+		var p Prep
+		if err := json.Unmarshal([]byte(m.Prep), &p); err == nil {
+			if o, err := p.Options(); err == nil {
+				return o
+			}
+		}
+		w.log.Warn("Невалиден избор за обработка; ползват се настройките на хъба", "файл", m.Name)
+	}
+	return w.options(ctx)
+}
+
+// shrinkImage fits the item's image into the screen box and makes the
+// smaller file its content.
+func (w *Worker) shrinkImage(ctx context.Context, m *store.Media, opts Options) error {
+	dir, err := w.storage.TempDir("image-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	ext := m.Ext
+	if ext == "webp" || ext == "jpeg" {
+		ext = "jpg" // WebP is not safe on every player
+	}
+	out := filepath.Join(dir, "out."+ext)
+	if err := w.ffmpeg(ctx, opts.imageArgs(w.storage.Path(m.SHA256, m.Ext), out)); err != nil {
+		return err
+	}
+	return w.replace(m, out, ext)
+}
+
+// replace makes the finished file at out the item's content (in memory; the
+// row changes when the item is marked ready).
+func (w *Worker) replace(m *store.Media, out, ext string) error {
+	sha, size, err := w.storage.Adopt(out, ext)
+	if err != nil {
+		return err
+	}
+	m.SHA256, m.Size, m.Ext = sha, size, ext
+	return nil
+}
+
+// dropUnused removes a replaced blob unless another item still serves it.
+func (w *Worker) dropUnused(ctx context.Context, old *store.Media) {
+	if used, err := w.store.BlobInUse(ctx, old.SHA256, old.Ext); err == nil && !used {
+		w.storage.Remove(old.SHA256, old.Ext)
+	}
+}
+
+func formatSize(n int64) string {
+	if n >= 1<<20 {
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	}
+	return fmt.Sprintf("%d KB", n>>10)
+}
+
+// inspectWith probes the file as it is now and marks the item ready, with
+// notes (e.g. "shrunk") in front of the compatibility warnings.
+func (w *Worker) inspectWith(ctx context.Context, m *store.Media, notes ...Warning) error {
+	path := w.storage.Path(m.SHA256, m.Ext)
+	p := store.MediaProbe{SHA256: m.SHA256, Ext: m.Ext, Size: m.Size}
 	var warnings []Warning
 
 	switch m.Kind {
@@ -117,9 +241,7 @@ func (w *Worker) inspect(ctx context.Context, m *store.Media) error {
 			warnings = CheckAudio(m.Ext, r)
 		}
 	}
-	if warnings == nil {
-		warnings = []Warning{}
-	}
+	warnings = append(append([]Warning{}, notes...), warnings...)
 	js, _ := json.Marshal(warnings)
 	p.Warnings = string(js)
 	return w.store.MarkMediaReady(ctx, m.ID, p)
@@ -148,35 +270,29 @@ func (w *Worker) convert(ctx context.Context, m *store.Media) error {
 	if err != nil {
 		return fmt.Errorf("изходният файл липсва: %w", err)
 	}
-	in := w.storage.Path(src.SHA256, src.Ext)
+	w.log.Info("Конвертиране на видео", "видео", src.Name, "резултат", m.Name)
+	out, err := w.encode(ctx, w.storage.Path(src.SHA256, src.Ext), src.Height > src.Width, w.optionsFor(ctx, src))
+	if err != nil {
+		return fmt.Errorf("конвертирането не успя: %w", err)
+	}
+	defer os.Remove(out)
+	return w.adopt(ctx, m, out)
+}
 
+// encode converts a video for the players into a temporary MP4 (see
+// Options.videoArgs); the caller removes or adopts it.
+func (w *Worker) encode(ctx context.Context, in string, portrait bool, opts Options) (string, error) {
 	tmp, err := w.storage.TempFile("convert-*.mp4")
 	if err != nil {
-		return err
+		return "", err
 	}
 	out := tmp.Name()
 	tmp.Close()
-	defer os.Remove(out)
-
-	// Fit inside 1920x1080 (1080x1920 for portrait) without upscaling.
-	boxW, boxH := maxLongSide, maxShortSide
-	if src.Height > src.Width {
-		boxW, boxH = maxShortSide, maxLongSide
+	if err := w.ffmpeg(ctx, opts.videoArgs(in, out, portrait)); err != nil {
+		os.Remove(out)
+		return "", err
 	}
-	scale := "scale='min(" + strconv.Itoa(boxW) + ",iw)':'min(" + strconv.Itoa(boxH) + ",ih)'" +
-		":force_original_aspect_ratio=decrease:force_divisible_by=2"
-	args := []string{"-v", "error", "-y", "-i", in,
-		"-map", "0:v:0", "-map", "0:a:0?",
-		"-c:v", "libx264", "-preset", "medium", "-crf", "21",
-		"-profile:v", "high", "-level:v", "4.1", "-pix_fmt", "yuv420p",
-		"-maxrate", "8M", "-bufsize", "16M", "-fpsmax", "30", "-vf", scale,
-		"-c:a", "aac", "-b:a", "128k", "-ac", "2",
-		"-movflags", "+faststart", out}
-	w.log.Info("Конвертиране на видео", "видео", src.Name, "резултат", m.Name)
-	if err := w.ffmpeg(ctx, args); err != nil {
-		return fmt.Errorf("конвертирането не успя: %w", err)
-	}
-	return w.adopt(ctx, m, out)
+	return out, nil
 }
 
 // render turns the item's slideshow recipe into an MP4.
@@ -239,6 +355,15 @@ func (w *Worker) render(ctx context.Context, m *store.Media) error {
 	if err := run(cmd); err != nil {
 		return fmt.Errorf("видеото не можа да се направи: %w", err)
 	}
+	if n := sh.Loops(); n > 0 {
+		// Repeat by copying the encoded stream: no quality loss, takes seconds.
+		looped := filepath.Join(dir, "looped.mp4")
+		if err := w.ffmpeg(ctx, []string{"-v", "error", "-y", "-stream_loop", strconv.Itoa(n), "-i", out,
+			"-map", "0", "-c", "copy", "-movflags", "+faststart", looped}); err != nil {
+			return fmt.Errorf("повторението на видеото не успя: %w", err)
+		}
+		out = looped
+	}
 	return w.adopt(ctx, m, out)
 }
 
@@ -261,12 +386,10 @@ func run(cmd *exec.Cmd) error {
 
 // adopt stores a freshly encoded MP4 as the item's content and inspects it.
 func (w *Worker) adopt(ctx context.Context, m *store.Media, out string) error {
-	sha, size, err := w.storage.Adopt(out, "mp4")
-	if err != nil {
+	if err := w.replace(m, out, "mp4"); err != nil {
 		return err
 	}
-	m.SHA256, m.Size, m.Ext = sha, size, "mp4"
-	return w.inspect(ctx, m)
+	return w.inspectWith(ctx, m)
 }
 
 // FindFont locates a caption font: tools/fonts next to the exe first, so a

@@ -120,11 +120,22 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 		log.Info("ffmpeg е наличен", "път", tools.FFmpeg)
 	}
 	worker := media.NewWorker(st, storage, tools, log)
+	worker.SetOptions(func(ctx context.Context) media.Options {
+		set, err := ops.Load(ctx, st)
+		if err != nil {
+			return ops.Defaults().MediaOptions()
+		}
+		return set.MediaOptions()
+	})
 	monitor := ops.NewMonitor(st, log, loc)
 	backup := ops.NewBackup(st, log, loc, c.dataDir)
 
 	playerH := player.New(st, storage, log, player.Config{
 		PublicURL: c.publicURL, Loc: loc, RefreshSec: int(c.refresh.Seconds()),
+		DefaultPoll: func(ctx context.Context) poll.Policy {
+			p, _ := ops.DefaultPoll(ctx, st, poll.Interval(c.refresh))
+			return p
+		},
 	})
 	scheme, port := c.playerEndpoint()
 	adminCfg := admin.Config{

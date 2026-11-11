@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api, errorText, type Device, type Kind, type TreeNode, type User } from "./api";
-import { ago, deviceState, isAdminOf, kindLabel, type TreeIndex } from "./model";
+import { ago, deviceState, isAdminOf, kindLabel, type TreeIndex, isStaff } from "./model";
 import type { Selection } from "./App";
 import { UsersSection } from "./UsersSection";
 import { MediaLibrary } from "./MediaLibrary";
@@ -89,10 +89,10 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
       <div className="card">
         <h3>Устройства {devices.length > 0 && <span className="muted">({devices.length})</span>}</h3>
         <DeviceTable devices={devices} idx={idx} showSite={node.kind !== "site"} serverTime={serverTime} onSelect={onSelect} />
-        {me.is_super && node.kind === "site" && <AddLinkDevice site={node} onChange={onChange} onSelect={onSelect} />}
+        {isStaff(me) && node.kind === "site" && <AddLinkDevice site={node} onChange={onChange} onSelect={onSelect} />}
       </div>
 
-      {devices.length > 0 && <PollCard node={node} />}
+      <PollCard node={node} />
 
       {admin && <UsersSection me={me} idx={idx} node={node} />}
       </>}

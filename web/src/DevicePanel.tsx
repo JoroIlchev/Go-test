@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api, errorText, type Device, type User } from "./api";
-import { ago, deviceState, type TreeIndex } from "./model";
+import { ago, deviceState, type TreeIndex, isStaff } from "./model";
 import type { Selection } from "./App";
 import { Breadcrumb } from "./NodePanel";
 
@@ -42,7 +42,7 @@ export function DevicePanel({ me, idx, device: d, serverTime, onChange, onSelect
         </dl>
       </div>
 
-      {me.is_super ? <DeviceSettings d={d} idx={idx} onChange={onChange} /> : (
+      {isStaff(me) ? <DeviceSettings d={d} idx={idx} onChange={onChange} /> : (
         <p className="muted">Настройките на устройството се управляват от оператора на системата.</p>
       )}
     </section>

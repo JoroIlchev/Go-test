@@ -46,8 +46,8 @@ export function PollCard({ node }: { node: TreeNode }) {
   );
 }
 
-function PollForm({ initial, canInherit, onSave, onCancel }: {
-  initial: PollPolicy; canInherit: boolean; onSave: (p: PollPolicy | null) => void; onCancel: () => void;
+export function PollForm({ initial, canInherit, inheritLabel = "Наследи отгоре", onSave, onCancel }: {
+  initial: PollPolicy; canInherit: boolean; inheritLabel?: string; onSave: (p: PollPolicy | null) => void; onCancel: () => void;
 }) {
   const [mode, setMode] = useState(initial.mode);
   const [minutes, setMinutes] = useState(initial.mode === "interval" ? initial.minutes : 15);
@@ -80,7 +80,7 @@ function PollForm({ initial, canInherit, onSave, onCancel }: {
       )}
       <div className="inline-form">
         <button className="primary" onClick={submit}>Запази</button>
-        {canInherit && <button className="ghost" onClick={() => onSave(null)}>Наследи отгоре</button>}
+        {canInherit && <button className="ghost" onClick={() => onSave(null)}>{inheritLabel}</button>}
         <button className="ghost" onClick={onCancel}>Отказ</button>
       </div>
     </div>

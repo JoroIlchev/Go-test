@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { api, errorText, uploadFile, type Media, type TreeNode, type User } from "./api";
+import { api, errorText, uploadFile, type Media, type Prep, type TreeNode, type User } from "./api";
 import { can, formatBytes, formatDuration, type TreeIndex } from "./model";
+import { PrepFields, prepSummary, samePrep } from "./PrepFields";
 import { SlideshowDialog } from "./SlideshowDialog";
 
 interface Props {
@@ -22,6 +23,25 @@ const ACCEPT = ".jpg,.jpeg,.png,.gif,.webp,.mp4,.m4v,.mov,.webm,.mkv,.avi,.mp3,.
 type KindFilter = "all" | "image" | "video" | "audio";
 const kindLabel = { image: "Снимка", video: "Видео", audio: "Аудио" };
 
+// The processing choice is remembered per client in this browser.
+const prepKey = (clientId: number) => `marquee.prep.${clientId}`;
+function savedPrep(clientId: number): Prep | null {
+  try {
+    const raw = localStorage.getItem(prepKey(clientId));
+    return raw ? (JSON.parse(raw) as Prep) : null;
+  } catch {
+    return null;
+  }
+}
+function storePrep(clientId: number, p: Prep | null) {
+  try {
+    if (p) localStorage.setItem(prepKey(clientId), JSON.stringify(p));
+    else localStorage.removeItem(prepKey(clientId));
+  } catch {
+    /* storage blocked: the choice lasts until reload */
+  }
+}
+
 export function MediaLibrary({ me, idx, node }: Props) {
   const canUpload = can(me, node, idx, "create");
   const [items, setItems] = useState<Media[]>([]);
@@ -34,20 +54,33 @@ export function MediaLibrary({ me, idx, node }: Props) {
   const [preview, setPreview] = useState<Media | null>(null);
   const [slideshow, setSlideshow] = useState(false);
   const [error, setError] = useState("");
+  const [hubPrep, setHubPrep] = useState<Prep | null>(null);
+  const [ownPrep, setOwnPrep] = useState<Prep | null>(() => savedPrep(node.client_id));
   const inputRef = useRef<HTMLInputElement>(null);
   const keyRef = useRef(0);
 
   const load = useCallback(async () => {
     try {
-      const res = await api<{ items: Media[]; ffmpeg: boolean }>("GET", `/api/media?node_id=${node.id}`);
+      const res = await api<{ items: Media[]; ffmpeg: boolean; prep: Prep }>("GET", `/api/media?node_id=${node.id}`);
       setItems(res.items);
       setFfmpeg(res.ffmpeg);
+      setHubPrep(res.prep);
     } catch (e) {
       setError(errorText(e));
     }
   }, [node.id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => setOwnPrep(savedPrep(node.client_id)), [node.client_id]);
+
+  const prep = ownPrep ?? hubPrep;
+  function changePrep(p: Partial<Prep>) {
+    if (!prep) return;
+    const next = { ...prep, ...p };
+    const own = hubPrep && samePrep(next, hubPrep) ? null : next;
+    setOwnPrep(own);
+    storePrep(node.client_id, own);
+  }
 
   // Poll while the server is still probing or converting something.
   const busy = items.some((m) => m.status === "processing");
@@ -65,7 +98,7 @@ export function MediaLibrary({ me, idx, node }: Props) {
     for (let i = 0; i < files.length; i++) {
       const { key } = queued[i];
       try {
-        const res = await uploadFile(node.id, files[i], (progress) => patch(key, { progress }));
+        const res = await uploadFile(node.id, files[i], (progress) => patch(key, { progress }), ownPrep ?? undefined);
         if (res.error) patch(key, { error: errorText(new Error(res.error)), done: true });
         else patch(key, { progress: 1, done: true });
       } catch (e) {
@@ -111,6 +144,25 @@ export function MediaLibrary({ me, idx, node }: Props) {
           <input ref={inputRef} type="file" multiple accept={ACCEPT} hidden
             onChange={(e) => { if (e.target.files?.length) uploadAll([...e.target.files]); e.target.value = ""; }} />
         </div>
+      )}
+      {canUpload && ffmpeg && prep && (
+        <details className="prep">
+          <summary>
+            ⚙ Обработка при качване: <strong>{prepSummary(prep)}</strong>
+            <span className="muted small">{ownPrep ? " — ваш избор" : " — по подразбиране"}</span>
+          </summary>
+          <p className="muted small">
+            Важи за следващите файлове, които качвате тук (запомня се за този клиент в този браузър). Качените вече
+            файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете
+            „Без смаляване“ преди качването.
+          </p>
+          <PrepFields value={prep} onChange={changePrep} />
+          {ownPrep && (
+            <p><button className="ghost" onClick={() => { setOwnPrep(null); storePrep(node.client_id, null); }}>
+              Върни по подразбиране
+            </button></p>
+          )}
+        </details>
       )}
       {!ffmpeg && <div className="notice">На сървъра няма ffmpeg: видеата се качват, но не се проверяват и нямат миниатюри.</div>}
 
@@ -175,6 +227,9 @@ function MediaCard({ m, inherited, onPreview, onRename, onDelete, onConvert }: {
 }) {
   const [open, setOpen] = useState(false);
   const errors = m.warnings.filter((w) => w.level === "error");
+  // "info" notes say what processing did (shrunk, converted); they are no problem.
+  const problems = m.warnings.filter((w) => w.level !== "info");
+  const notes = m.warnings.length - problems.length;
   const meta = [
     m.width > 0 && `${m.width}×${m.height}`,
     m.duration_ms > 0 && formatDuration(m.duration_ms),
@@ -197,11 +252,14 @@ function MediaCard({ m, inherited, onPreview, onRename, onDelete, onConvert }: {
         <div className="status-row">
           {m.status === "processing" && <span className="tag busy">{m.source_id ? "Конвертиране…" : "Проверка…"}</span>}
           {m.status === "failed" && <span className="tag bad" title={m.error}>Грешка</span>}
-          {m.status === "ready" && m.warnings.length === 0 && <span className="tag good">✓ Съвместимо</span>}
-          {m.status === "ready" && m.warnings.length > 0 && (
+          {m.status === "ready" && problems.length === 0 && <span className="tag good">✓ Съвместимо</span>}
+          {m.status === "ready" && problems.length > 0 && (
             <button className={"tag " + (errors.length ? "bad" : "warn")} onClick={() => setOpen(!open)}>
-              {errors.length ? "✕ Няма да тръгне" : "⚠ Внимание"} ({m.warnings.length})
+              {errors.length ? "✕ Няма да тръгне" : "⚠ Внимание"} ({problems.length})
             </button>
+          )}
+          {m.status === "ready" && notes > 0 && (
+            <button className="tag" onClick={() => setOpen(!open)} title="Какво направи хъбът с файла">ⓘ Обработен</button>
           )}
         </div>
         {m.status === "failed" && <div className="error small">{m.error}</div>}

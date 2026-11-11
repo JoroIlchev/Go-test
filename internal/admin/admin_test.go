@@ -287,3 +287,60 @@ func TestUnauthenticated(t *testing.T) {
 }
 
 func itoa(v int64) string { b, _ := json.Marshal(v); return string(b) }
+
+// Managers work only the clients given to them (plus the ones they open),
+// pair devices there, and never touch the team; the last super admin stays.
+func TestManagers(t *testing.T) {
+	e := newEnv(t)
+	root := e.login("root@hub")
+	a := root.mustNode(nil, "client", "A")
+	b := root.mustNode(nil, "client", "B")
+	siteB := root.mustNode(&b, "site", "B1")
+
+	var mgr struct {
+		ID      int64   `json:"id"`
+		Clients []int64 `json:"clients"`
+	}
+	root.mustDo("POST", "/api/staff", map[string]any{"email": "mgr@hub", "name": "M", "password": pw,
+		"kind": "manager", "clients": []int64{a}}, http.StatusCreated, &mgr)
+	m := e.login("mgr@hub")
+
+	var tree struct{ Nodes []struct{ ID int64 } }
+	m.mustDo("GET", "/api/tree", nil, http.StatusOK, &tree)
+	if len(tree.Nodes) != 1 || tree.Nodes[0].ID != a {
+		t.Fatalf("manager sees %+v, want only client A", tree.Nodes)
+	}
+	m.mustDo("POST", "/api/nodes", map[string]any{"parent_id": siteB, "kind": "site", "name": "x"}, http.StatusForbidden, nil)
+	m.mustDo("GET", "/api/staff", nil, http.StatusForbidden, nil)
+	m.mustDo("GET", "/api/billing", nil, http.StatusForbidden, nil)
+
+	// A new client is theirs right away.
+	var c struct{ ID int64 }
+	m.mustDo("POST", "/api/nodes", map[string]any{"kind": "client", "name": "C"}, http.StatusCreated, &c)
+	siteC := m.mustNode(&c.ID, "site", "C1")
+	m.mustDo("POST", "/api/devices", map[string]any{"site_id": siteC, "name": "tv"}, http.StatusCreated, nil)
+	m.mustDo("POST", "/api/devices", map[string]any{"site_id": siteB, "name": "tv"}, http.StatusForbidden, nil)
+
+	// Given all clients plus billing, they see B and its usage.
+	root.mustDo("PATCH", "/api/staff/"+itoa(mgr.ID), map[string]any{"access": map[string]any{"kind": "manager",
+		"all_clients": true, "can_billing": true}}, http.StatusOK, nil)
+	m.mustDo("POST", "/api/devices", map[string]any{"site_id": siteB, "name": "tv"}, http.StatusCreated, nil)
+	m.mustDo("GET", "/api/billing", nil, http.StatusOK, nil)
+
+	// The only super admin cannot be switched off or demoted ...
+	var me struct{ ID int64 }
+	root.mustDo("GET", "/api/me", nil, http.StatusOK, &me)
+	root.mustDo("PATCH", "/api/staff/"+itoa(me.ID), map[string]any{"active": false}, http.StatusConflict, nil)
+	root.mustDo("PATCH", "/api/staff/"+itoa(me.ID), map[string]any{"access": map[string]any{"kind": "manager"}}, http.StatusConflict, nil)
+	// ... until there is another one; then the old one steps down.
+	root.mustDo("PATCH", "/api/staff/"+itoa(mgr.ID), map[string]any{"access": map[string]any{"kind": "super"}}, http.StatusOK, nil)
+	root.mustDo("PATCH", "/api/staff/"+itoa(me.ID), map[string]any{"active": false}, http.StatusOK, nil)
+	m.mustDo("GET", "/api/staff", nil, http.StatusOK, nil)
+}
+
+func (c *client) mustDo(method, path string, in any, want int, out any) {
+	c.e.t.Helper()
+	if code, body := c.do(method, path, in, out); code != want {
+		c.e.t.Fatalf("%s %s: %d, want %d: %s", method, path, code, want, body)
+	}
+}

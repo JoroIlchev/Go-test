@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, errorText, type BackupResult, type HubSettings } from "./api";
 import { formatBytes } from "./model";
+import { PollForm } from "./PollCard";
+import { PrepFields } from "./PrepFields";
 
 /** Hub-wide settings, for the super admin: alert e-mails and backups. */
 export function SettingsPanel() {
@@ -10,6 +12,7 @@ export function SettingsPanel() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [testTo, setTestTo] = useState("");
+  const [pollEdit, setPollEdit] = useState(false);
 
   const apply = (v: HubSettings) => {
     setS({ ...v, smtp_pass: "" });
@@ -40,6 +43,8 @@ export function SettingsPanel() {
       smtp_host: s.smtp_host, smtp_port: s.smtp_port, smtp_user: s.smtp_user, smtp_pass: s.smtp_pass, smtp_from: s.smtp_from,
       alert_emails: emails.split(/[,;\s]+/).filter(Boolean), alert_admins: s.alert_admins, alert_grace_min: s.alert_grace_min,
       backup_time: s.backup_time, backup_keep: s.backup_keep, backup_dir: s.backup_dir,
+      image_screen: s.image_screen, image_quality: s.image_quality,
+      video_auto: s.video_auto, video_max: s.video_max, video_quality: s.video_quality,
     }));
   }, "Настройките са запазени.");
 
@@ -87,6 +92,47 @@ export function SettingsPanel() {
             обектите въведете публичния статичен IP и пренасочете на рутера порт 8080 (TCP) към тази машина.
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="title-row">
+          <h3>Проверка за ново съдържание — по подразбиране</h3>
+          <span className="spacer" />
+          {!pollEdit && <button className="ghost" onClick={() => setPollEdit(true)}>Промени</button>}
+        </div>
+        {!pollEdit && (
+          <p>Устройствата проверяват <strong>{s.default_poll_text}</strong>{" "}
+            <span className="muted small">({s.default_poll_own ? "зададено тук" : "от стартирането на marquee, -refresh"})</span></p>
+        )}
+        {pollEdit && (
+          <PollForm initial={s.default_poll} canInherit={s.default_poll_own} inheritLabel="Върни стойността от стартирането"
+            onCancel={() => setPollEdit(false)}
+            onSave={(policy) => run(async () => {
+              apply(await api<HubSettings>("PUT", "/api/settings/poll", { policy }));
+              setPollEdit(false);
+            }, "Проверката по подразбиране е сменена. Устройствата я получават при следващата си проверка.")} />
+        )}
+        <p className="muted small">
+          Важи за всички клиенти, които нямат собствена настройка. За отделен клиент, група или обект: отворете го в дървото
+          вляво → картата „Проверка за ново съдържание“ → Промени. Най-близката настройка нагоре по дървото печели.
+        </p>
+      </div>
+
+      <div className="card">
+        <h3>Обработка на качените файлове — по подразбиране</h3>
+        <p className="muted small">
+          Това е изборът по подразбиране в „Медия“. Който качва, може да го смени за своите качвания (например без
+          смаляване за една кампания или вертикален екран за друга). Вече качените файлове не се променят.
+        </p>
+        <PrepFields value={s} onChange={set} />
+        <p className="muted small">
+          Снимка от телефон е 4000×3000 и повече: устройството я зарежда бавно, а слабите Android кутии могат да останат без
+          памет. Смалената снимка изглежда същата на екрана. Снимки, които вече се побират, не се пипат.
+        </p>
+        <p className="muted small">
+          Конвертираното видео е H.264 MP4 до 30 кадъра/сек — форматът, който всяко Android 7 устройство пуска. При
+          автоматично конвертиране файлът се заменя (оригиналът не се пази); с бутона се прави отделно копие.
+        </p>
       </div>
 
       <div className="card">

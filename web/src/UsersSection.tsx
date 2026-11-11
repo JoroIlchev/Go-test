@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText, type Role, type TreeNode, type User } from "./api";
-import { roleSummary, type TreeIndex } from "./model";
+import { roleSummary, type TreeIndex, isStaff } from "./model";
 
 interface Props {
   me: User;
@@ -17,14 +17,15 @@ export function UsersSection({ me, idx, node }: Props) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<User | "new" | null>(null);
 
+  const staff = isStaff(me);
   const load = useCallback(async () => {
     try {
-      const q = me.is_super ? `?client_id=${node.client_id}` : "";
+      const q = staff ? `?client_id=${node.client_id}` : "";
       setUsers(await api<User[]>("GET", "/api/users" + q));
     } catch (e) {
       setError(errorText(e));
     }
-  }, [me.is_super, node.client_id]);
+  }, [staff, node.client_id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -91,7 +92,7 @@ function UserForm({ me, node, user, onDone }: { me: User; node: TreeNode; user: 
       if (user === null) {
         await api("POST", "/api/users", {
           email, name, password, roles: [role],
-          client_id: me.is_super ? node.client_id : undefined,
+          client_id: isStaff(me) ? node.client_id : undefined,
         });
       } else {
         // Roles are replaced as a whole: keep the user's roles elsewhere untouched.

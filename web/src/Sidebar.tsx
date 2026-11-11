@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { TreeNode, User } from "./api";
-import { deviceState, type TreeIndex } from "./model";
+import { deviceState, isStaff, type TreeIndex } from "./model";
 import type { Selection } from "./App";
 
 interface Props {
@@ -15,18 +15,19 @@ interface Props {
 
 export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime, onSelect }: Props) {
   const roots = idx.children.get(null) ?? [];
-  const isAdminSomewhere = me.is_super || me.roles.some((r) => r.role === "admin");
+  const staff = isStaff(me);
+  const isAdminSomewhere = staff || me.roles.some((r) => r.role === "admin");
   const offline = idx.devices.filter((d) => deviceState(d, serverTime) === "offline").length;
   return (
     <nav className="tree">
-      {isAdminSomewhere && !me.is_super && (
+      {isAdminSomewhere && !staff && (
         <div className="tree-actions">
           <button className={"nav-item" + (sel?.type === "approvals" ? " active" : "")} onClick={() => onSelect({ type: "approvals" })}>
             За одобрение {approvalCount > 0 && <span className="count">{approvalCount}</span>}
           </button>
         </div>
       )}
-      {me.is_super && (
+      {staff && (
         <div className="tree-actions">
           <button className={"nav-item" + (sel?.type === "pending" ? " active" : "")} onClick={() => onSelect({ type: "pending" })}>
             Чакащи устройства {pendingCount > 0 && <span className="count">{pendingCount}</span>}
@@ -37,15 +38,26 @@ export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime,
           <button className={"nav-item" + (sel?.type === "new-client" ? " active" : "")} onClick={() => onSelect({ type: "new-client" })}>
             + Нов клиент
           </button>
-          <button className={"nav-item" + (sel?.type === "billing" ? " active" : "")} onClick={() => onSelect({ type: "billing" })}>
-            Таксуване
-          </button>
-          <button className={"nav-item" + (sel?.type === "logs" ? " active" : "")} onClick={() => onSelect({ type: "logs" })}>
-            Логове
-          </button>
-          <button className={"nav-item" + (sel?.type === "settings" ? " active" : "")} onClick={() => onSelect({ type: "settings" })}>
-            Настройки {offline > 0 && <span className="count warn" title="Офлайн устройства">{offline} офлайн</span>}
-          </button>
+          {(me.is_super || me.can_billing) && (
+            <button className={"nav-item" + (sel?.type === "billing" ? " active" : "")} onClick={() => onSelect({ type: "billing" })}>
+              Таксуване
+            </button>
+          )}
+          {(me.is_super || me.can_logs) && (
+            <button className={"nav-item" + (sel?.type === "logs" ? " active" : "")} onClick={() => onSelect({ type: "logs" })}>
+              Логове
+            </button>
+          )}
+          {me.is_super && (
+            <button className={"nav-item" + (sel?.type === "team" ? " active" : "")} onClick={() => onSelect({ type: "team" })}>
+              Екип
+            </button>
+          )}
+          {me.is_super && (
+            <button className={"nav-item" + (sel?.type === "settings" ? " active" : "")} onClick={() => onSelect({ type: "settings" })}>
+              Настройки {offline > 0 && <span className="count warn" title="Офлайн устройства">{offline} офлайн</span>}
+            </button>
+          )}
         </div>
       )}
       {roots.length === 0 && <div className="muted pad">Няма звена.</div>}

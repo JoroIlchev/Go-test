@@ -3,6 +3,7 @@ package admin
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -64,7 +65,7 @@ func toDeviceDTO(d *store.Device, u *store.User, publicURL string) deviceDTO {
 	if d.OfflineSince.Valid {
 		out.OfflineSince = &d.OfflineSince.String
 	}
-	if u.IsSuper {
+	if auth.Staff(u) {
 		out.PairingCode = d.PairingCode
 		out.URL = publicURL + "/d/" + d.Token + "/index.smil"
 	}
@@ -72,10 +73,15 @@ func toDeviceDTO(d *store.Device, u *store.User, publicURL string) deviceDTO {
 }
 
 // visibleRoots are the top nodes of what u may see: all clients for a super
-// admin, otherwise the role nodes that are not inside another role node.
+// admin, their clients for a manager, otherwise the role nodes that are not
+// inside another role node.
 func (s *Server) visibleRoots(r *http.Request, u *store.User) ([]*store.Node, error) {
-	if u.IsSuper {
-		return s.store.Clients(r.Context())
+	if auth.Staff(u) {
+		clients, err := s.store.Clients(r.Context())
+		if err != nil {
+			return nil, err
+		}
+		return slices.DeleteFunc(clients, func(c *store.Node) bool { return !auth.ManagesClient(u, c.ID) }), nil
 	}
 	var nodes []*store.Node
 	for _, role := range u.Roles {
@@ -134,7 +140,7 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{
 		"nodes": nodes, "devices": devices, "server_time": time.Now().UTC().Format(time.RFC3339),
 	}
-	if u.IsSuper {
+	if auth.Staff(u) {
 		out["hub_url"] = hub
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -152,7 +158,7 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	}
 	var parent *store.Node
 	if in.ParentID == nil {
-		if !u.IsSuper {
+		if !auth.Staff(u) {
 			forbidden(w)
 			return
 		}
@@ -172,6 +178,13 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.storeErr(w, err)
 		return
+	}
+	// A manager who opens a new client keeps working it.
+	if parent == nil && u.IsManager && !u.AllClients {
+		if err := s.store.AddManagerClient(r.Context(), u.ID, n.ID); err != nil {
+			s.fail(w, err)
+			return
+		}
 	}
 	s.audit(r, "node.create", n.ID, n.Kind+" "+n.Name)
 	writeJSON(w, http.StatusCreated, toNodeDTO(n))
@@ -237,11 +250,11 @@ func (s *Server) deleteNode(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- devices: super admin only for now ---
+// --- devices: super admins and managers (on their clients' sites) ---
 
 func (s *Server) pendingDevices(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	if !u.IsSuper {
+	if !auth.Staff(u) {
 		forbidden(w)
 		return
 	}
@@ -273,7 +286,7 @@ func (s *Server) siteFor(w http.ResponseWriter, r *http.Request, id int64) *stor
 
 func (s *Server) pairDevice(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	if !u.IsSuper {
+	if !auth.Staff(u) {
 		forbidden(w)
 		return
 	}
@@ -287,6 +300,10 @@ func (s *Server) pairDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	site := s.siteFor(w, r, in.SiteID)
 	if site == nil {
+		return
+	}
+	if !auth.Can(u, site, auth.PermAdmin) {
+		forbidden(w)
 		return
 	}
 	d, err := s.store.PairDevice(r.Context(), in.Code, site, in.Name)
@@ -304,7 +321,7 @@ func (s *Server) pairDevice(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createLinkDevice(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	if !u.IsSuper {
+	if !auth.Staff(u) {
 		forbidden(w)
 		return
 	}
@@ -319,6 +336,10 @@ func (s *Server) createLinkDevice(w http.ResponseWriter, r *http.Request) {
 	if site == nil {
 		return
 	}
+	if !auth.Can(u, site, auth.PermAdmin) {
+		forbidden(w)
+		return
+	}
 	d, err := s.store.CreateLinkDevice(r.Context(), site, in.Name)
 	if err != nil {
 		s.storeErr(w, err)
@@ -330,7 +351,7 @@ func (s *Server) createLinkDevice(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateDevice(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	if !u.IsSuper {
+	if !auth.Staff(u) {
 		forbidden(w)
 		return
 	}
@@ -351,10 +372,28 @@ func (s *Server) updateDevice(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &in) {
 		return
 	}
+	// A manager edits devices on their clients' sites and moves them only
+	// between those; unpaired devices belong to no client yet.
+	cur, err := s.store.Device(r.Context(), id)
+	if err != nil {
+		s.storeErr(w, err)
+		return
+	}
+	if !u.IsSuper {
+		n, err := s.store.Node(r.Context(), cur.NodeID.Int64)
+		if !cur.NodeID.Valid || err != nil || !auth.Can(u, n, auth.PermAdmin) {
+			forbidden(w)
+			return
+		}
+	}
 	upd := store.DeviceUpdate{Name: in.Name, Status: in.Status, AuthMode: in.AuthMode,
 		AuthUser: in.AuthUser, RotateToken: in.RotateToken}
 	if in.SiteID != nil {
 		if upd.Site = s.siteFor(w, r, *in.SiteID); upd.Site == nil {
+			return
+		}
+		if !auth.Can(u, upd.Site, auth.PermAdmin) {
+			forbidden(w)
 			return
 		}
 	}

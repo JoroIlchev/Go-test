@@ -9,16 +9,22 @@ import (
 )
 
 type User struct {
-	ID        int64         `json:"id"`
-	Email     string        `json:"email"`
-	Name      string        `json:"name"`
-	PassHash  string        `json:"-"`
-	IsSuper   bool          `json:"is_super"`
-	ClientID  sql.NullInt64 `json:"-"`
-	ClientRef *int64        `json:"client_id"`
-	Active    bool          `json:"active"`
-	CreatedAt string        `json:"created_at"`
-	Roles     []Role        `json:"roles"`
+	ID       int64  `json:"id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	PassHash string `json:"-"`
+	IsSuper  bool   `json:"is_super"`
+	// Managers (staff of the hub operator) work the listed clients, or all.
+	IsManager  bool          `json:"is_manager"`
+	AllClients bool          `json:"all_clients"`
+	Clients    []int64       `json:"clients"`
+	CanBilling bool          `json:"can_billing"`
+	CanLogs    bool          `json:"can_logs"`
+	ClientID   sql.NullInt64 `json:"-"`
+	ClientRef  *int64        `json:"client_id"`
+	Active     bool          `json:"active"`
+	CreatedAt  string        `json:"created_at"`
+	Roles      []Role        `json:"roles"`
 }
 
 type Role struct {
@@ -30,11 +36,13 @@ type Role struct {
 	NeedsApproval bool   `json:"needs_approval"`
 }
 
-const userCols = `id, email, name, pass_hash, is_super, client_id, active, created_at`
+const userCols = `id, email, name, pass_hash, is_super, is_manager, all_clients, can_billing, can_logs,
+	client_id, active, created_at`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PassHash, &u.IsSuper, &u.ClientID, &u.Active, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PassHash, &u.IsSuper, &u.IsManager, &u.AllClients,
+		&u.CanBilling, &u.CanLogs, &u.ClientID, &u.Active, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -111,7 +119,126 @@ func (s *Store) loadRoles(ctx context.Context, u *User) error {
 		}
 		u.Roles = append(u.Roles, r)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return s.loadClients(ctx, u)
+}
+
+func (s *Store) loadClients(ctx context.Context, u *User) error {
+	u.Clients = []int64{}
+	if !u.IsManager {
+		return nil
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT client_id FROM manager_clients WHERE user_id = ? ORDER BY client_id`, u.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		u.Clients = append(u.Clients, id)
+	}
 	return rows.Err()
+}
+
+// Staff returns the hub operator's people: super admins and managers.
+func (s *Store) Staff(ctx context.Context) ([]*User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+userCols+` FROM users WHERE client_id IS NULL ORDER BY is_super DESC, name, email`)
+	if err != nil {
+		return nil, err
+	}
+	var out []*User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, u := range out {
+		if err := s.loadRoles(ctx, u); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// ActiveSupers counts the super admins who can still log in.
+func (s *Store) ActiveSupers(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE is_super = 1 AND active = 1`).Scan(&n)
+	return n, err
+}
+
+// StaffAccess is what a staff member may do: Super, or a manager of Clients
+// (or AllClients) with the optional billing and logs pages.
+type StaffAccess struct {
+	Super      bool
+	AllClients bool
+	Clients    []int64
+	CanBilling bool
+	CanLogs    bool
+}
+
+// CreateStaff adds a super admin or a manager.
+func (s *Store) CreateStaff(ctx context.Context, email, name, passHash string, a StaffAccess, createdBy int64) (*User, error) {
+	u, err := s.CreateUser(ctx, email, name, passHash, a.Super, nil, &createdBy, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.SetStaffAccess(ctx, u.ID, a); err != nil {
+		return nil, err
+	}
+	return s.User(ctx, u.ID)
+}
+
+// SetStaffAccess replaces a staff member's access; a super admin keeps no
+// manager settings.
+func (s *Store) SetStaffAccess(ctx context.Context, id int64, a StaffAccess) error {
+	if a.Super {
+		a = StaffAccess{Super: true}
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE users SET is_super = ?, is_manager = ?, all_clients = ?, can_billing = ?, can_logs = ?
+		 WHERE id = ? AND client_id IS NULL`,
+		a.Super, !a.Super, a.AllClients, a.CanBilling, a.CanLogs, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM manager_clients WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+	if !a.AllClients {
+		for _, c := range a.Clients {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT OR IGNORE INTO manager_clients (user_id, client_id) VALUES (?, ?)`, id, c); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// AddManagerClient gives a manager one more client (the one they created).
+func (s *Store) AddManagerClient(ctx context.Context, userID, clientID int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO manager_clients (user_id, client_id) VALUES (?, ?)`, userID, clientID)
+	return err
 }
 
 // CreateUser inserts a user with its roles in one transaction.

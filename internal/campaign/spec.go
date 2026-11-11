@@ -21,13 +21,17 @@ type Spec struct {
 	Days     []int   `json:"days"`    // ISO weekdays; empty = every day
 	TimeFrom string  `json:"time_from"`
 	TimeTo   string  `json:"time_to"`
-	Priority int     `json:"priority"` // 0 normal, 1 high (e.g. a sale that replaces normal content)
+	Priority int     `json:"priority"`        // 0 normal, 1 high (e.g. a sale that replaces normal content)
+	Order    string  `json:"order,omitempty"` // "" in playlist order | shuffle (a new order every day)
 }
 
 type Item struct {
 	MediaID   int64   `json:"media_id"`
-	DurationS float64 `json:"duration_s"` // images; videos play to their end when 0
+	DurationS float64 `json:"duration_s"`      // images; videos play to their end when 0
+	Every     int     `json:"every,omitempty"` // >= 2: shown as every Nth item (see Sequence)
 }
+
+const maxEvery = 50
 
 const localLayout = "2006-01-02T15:04"
 
@@ -95,10 +99,26 @@ func (s Spec) ValidateDraft(loc *time.Location) error {
 	if s.Priority < 0 || s.Priority > 1 {
 		return fmt.Errorf("priority must be 0 or 1")
 	}
+	if s.Order != "" && s.Order != "shuffle" {
+		return fmt.Errorf("invalid order %q", s.Order)
+	}
+	share, regular := 0.0, 0
 	for _, it := range s.Items {
 		if it.DurationS < 0 || it.DurationS > 3600 {
 			return fmt.Errorf("duration must be between 0 and 3600 seconds")
 		}
+		if it.Every < 0 || it.Every > maxEvery {
+			return fmt.Errorf("every must be between 2 and %d", maxEvery)
+		}
+		if it.Every >= 2 {
+			share += 1 / float64(it.Every)
+		} else {
+			regular++
+		}
+	}
+	// Focus items may not take every slot: the others need room too.
+	if regular > 0 && share >= 0.999 {
+		return fmt.Errorf("too many frequent items")
 	}
 	_, err := s.Rule(loc)
 	return err

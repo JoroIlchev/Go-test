@@ -45,7 +45,7 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
   const byId = new Map(library.map((m) => [m.id, m]));
   const [name, setName] = useState(initialName ?? "Слайдшоу");
   const [sh, setSh] = useState<Slideshow>({
-    items: [], transition: "fade", transition_s: 1, motion: true, background: "blur", portrait: false,
+    items: [], transition: "fade", transition_s: 1, motion: true, background: "blur", portrait: false, repeat_to_s: 60,
     text_style: { font: "arial", size: "m", color: "#ffffff", box: "dark" }, ...initial,
   });
   const [sel, setSel] = useState(0);
@@ -60,7 +60,7 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   function move(from: number, to: number) {
@@ -86,6 +86,7 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
   const total = items.reduce((s, it) => s + it.duration_s, 0);
   const tooShort = sh.transition !== "none" && items.length > 1 && items.some((it) => it.duration_s <= sh.transition_s);
   const cur = Math.min(sel, items.length - 1);
+  const repeats = sh.repeat_to_s && total > 0 && sh.repeat_to_s > total ? Math.ceil(sh.repeat_to_s / total) : 1;
   const shown = cur >= 0 ? items[cur] : undefined;
   const first = shown ? byId.get(shown.media_id) : undefined;
   const st = sh.text_style;
@@ -234,13 +235,25 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
                 {audios.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </label>
+
+            <label>Повтори снимките във видеото, докато стане поне
+              <select value={sh.repeat_to_s ?? 0} onChange={(e) => set({ repeat_to_s: Number(e.target.value) || undefined })}>
+                <option value={0}>Без повторение</option>
+                {[60, 120, 300, 600].map((s) => <option key={s} value={s}>{s / 60} мин</option>)}
+              </select>
+            </label>
+            <p className="muted small">
+              Кратък клип, който плейърът пуска отначало пак и пак, мига в черно при всяко повторение и на някои устройства
+              натоварва паметта. По-дългият файл се върти гладко.
+            </p>
           </div>
         </div>
 
         {error && <div className="error">{error}</div>}
         {tooShort && <div className="notice small">Всяка снимка трябва да стои по-дълго от прехода ({sh.transition_s.toLocaleString("bg-BG")} сек).</div>}
         <div className="title-row">
-          <span className="muted">Дължина: <strong>{formatDuration(total * 1000)}</strong>{items.length > 0 && ` · ${items.length} снимки`}</span>
+          <span className="muted">Дължина: <strong>{formatDuration(total * 1000)}</strong>{items.length > 0 && ` · ${items.length} снимки`}
+            {repeats > 1 && <> · повторено {repeats}× = <strong>{formatDuration(total * repeats * 1000)}</strong></>}</span>
           <span className="spacer" />
           {replaceLabel && (
             <label className="check small"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> {replaceLabel}</label>

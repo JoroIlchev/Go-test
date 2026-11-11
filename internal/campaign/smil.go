@@ -34,6 +34,9 @@ type Builder struct {
 	Loc        *time.Location
 	MediaURL   func(m *store.Media) string
 	RefreshSec int
+	// Seed varies shuffled playlists between devices; with the date it
+	// gives each device a new order every day.
+	Seed uint64
 }
 
 // Build renders the SMIL index for a device. Segments become <par> blocks in
@@ -83,7 +86,8 @@ func (b Builder) Build(now time.Time, playables []Playable, media map[int64]*sto
 			if fit == "" {
 				fit = "meet"
 			}
-			for _, it := range p.Spec.Items {
+			for _, i := range p.Spec.Sequence(b.seed(from, p.VersionID)) {
+				it := p.Spec.Items[i]
 				m := media[it.MediaID]
 				if m == nil || m.Status != "ready" {
 					continue
@@ -122,6 +126,12 @@ func (b Builder) writeItem(buf *bytes.Buffer, m *store.Media, it Item, fit strin
 			fmt.Fprintf(buf, "        <video src=\"%s\" region=\"screen\" fit=\"%s\"/>\n", src, fit)
 		}
 	}
+}
+
+// seed mixes the device, the day and the version, so the order (and with it
+// the index) stays the same all day and changes at midnight with the window.
+func (b Builder) seed(day time.Time, version int64) uint64 {
+	return b.Seed*1_000_003 + uint64(day.Year()*10000+int(day.Month())*100+day.Day())*7919 + uint64(version)
 }
 
 // wallclock uses an explicit UTC offset so the player cannot misread the zone.

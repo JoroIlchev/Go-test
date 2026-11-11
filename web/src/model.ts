@@ -53,9 +53,16 @@ export class TreeIndex {
 
 export type Perm = "view" | "create" | "edit" | "publish" | "admin";
 
+/** Super admins and managers: the hub operator's people. */
+export const isStaff = (u: User) => u.is_super || u.is_manager;
+
+/** Mirrors auth.ManagesClient: full rights on the whole client. */
+export const managesClient = (u: User, clientId: number) =>
+  u.is_super || (u.is_manager && (u.all_clients || u.clients.includes(clientId)));
+
 /** Mirrors auth.Can on the server; the server still enforces it. */
 export function can(u: User, n: TreeNode, idx: TreeIndex, p: Perm): boolean {
-  if (u.is_super) return true;
+  if (managesClient(u, n.client_id)) return true;
   if (u.client_id !== n.client_id) return false;
   const ids = new Set(idx.chain(n).map((x) => x.id));
   return u.roles.some((r) => {

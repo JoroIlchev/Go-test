@@ -7,7 +7,7 @@ import (
 
 // Warning is one compatibility finding. Level "error" means the file will most
 // likely not play on an Android 7 player; "warn" means it may stutter or fail
-// on weaker devices.
+// on weaker devices; "info" is a note on what processing did (e.g. "shrunk").
 type Warning struct {
 	Level   string `json:"level"`
 	Code    string `json:"code"`
@@ -44,7 +44,9 @@ func CheckVideo(ext string, p *ProbeResult) []Warning {
 	default:
 		add("error", "codec", "Видео кодек %s: за Android 7 се препоръчва H.264.", strings.ToUpper(p.VideoCodec))
 	}
-	if p.PixFmt != "" && p.PixFmt != "yuv420p" && p.PixFmt != "yuvj420p" {
+	if p.PixFmt == "yuvj420p" {
+		add("warn", "pixfmt", "Цветови формат yuvj420p (пълен диапазон): някои устройства показват черен или замръзнал кадър. Конвертирайте го.")
+	} else if p.PixFmt != "" && p.PixFmt != "yuv420p" {
 		add("warn", "pixfmt", "Цветови формат %s: по-сигурен е yuv420p.", p.PixFmt)
 	}
 	long, short := max(p.Width, p.Height), min(p.Width, p.Height)
@@ -89,5 +91,13 @@ func CheckImage(ext string, width, height int) []Warning {
 
 // Convertible reports whether converting the video would fix its warnings.
 func Convertible(kind string, w []Warning) bool {
-	return kind == "video" && len(w) > 0
+	if kind != "video" {
+		return false
+	}
+	for _, x := range w {
+		if x.Level != "info" {
+			return true
+		}
+	}
+	return false
 }

@@ -38,6 +38,9 @@ type Config struct {
 	PublicURL  string         // prefixes media URLs in the index
 	Loc        *time.Location // time zone of schedules
 	RefreshSec int            // how often players re-check the index
+	// DefaultPoll, when set, gives the hub-wide schedule (from the settings)
+	// in place of RefreshSec.
+	DefaultPoll func(context.Context) poll.Policy
 }
 
 func New(st *store.Store, storage *media.Storage, log *slog.Logger, cfg Config) *Handler {
@@ -124,7 +127,7 @@ func (h *Handler) serveIndex(w http.ResponseWriter, r *http.Request, d *store.De
 			return
 		}
 		refresh = policy.RefreshSec(now, h.cfg.Loc, d.ID)
-		body, versions, labels, err := h.campaignIndex(r.Context(), site, now, refresh, requestBase(r, h.cfg.PublicURL))
+		body, versions, labels, err := h.campaignIndex(r.Context(), site, uint64(d.ID), now, refresh, requestBase(r, h.cfg.PublicURL))
 		if err != nil {
 			h.fail(w, err)
 			return
@@ -167,7 +170,11 @@ func (h *Handler) policyFor(ctx context.Context, site *store.Node) (poll.Policy,
 	if err != nil {
 		return poll.Policy{}, err
 	}
-	p, _ := poll.Resolve(chain, set, poll.Interval(time.Duration(h.cfg.RefreshSec)*time.Second))
+	def := poll.Interval(time.Duration(h.cfg.RefreshSec) * time.Second)
+	if h.cfg.DefaultPoll != nil {
+		def = h.cfg.DefaultPoll(ctx)
+	}
+	p, _ := poll.Resolve(chain, set, def)
 	return p, nil
 }
 
@@ -201,7 +208,7 @@ func (h *Handler) pairPage(w http.ResponseWriter, r *http.Request) {
 // campaignIndex builds the SMIL for every live campaign targeting the device's
 // site or one of its ancestors.
 // labels name the included versions ("Обедно меню v2") for the log.
-func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, now time.Time, refresh int, base string) (body []byte, included []int64, labels []string, err error) {
+func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, seed uint64, now time.Time, refresh int, base string) (body []byte, included []int64, labels []string, err error) {
 	onPath := map[int64]bool{}
 	for _, id := range site.AncestorIDs() {
 		onPath[id] = true
@@ -250,6 +257,7 @@ func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, now time.
 	b := campaign.Builder{
 		Loc:        h.cfg.Loc,
 		RefreshSec: refresh,
+		Seed:       seed,
 		MediaURL:   func(m *store.Media) string { return base + "/m/" + m.FileName() },
 	}
 	body, included = b.Build(now, playables, media)
@@ -361,13 +369,17 @@ func statusSMIL(refresh int) []byte {
 }
 
 var pairTmpl = template.Must(template.New("pair").Parse(`<!doctype html>
-<html><head><meta charset="utf-8"><title>marquee</title>
+<html><head><meta charset="utf-8"><title>Marquee</title>
 <style>
-html,body{margin:0;height:100%;background:#111;color:#eee;font-family:sans-serif}
-body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
-.code{font-size:18vh;font-weight:700;letter-spacing:2vh;color:#ffd166}
+html,body{margin:0;height:100%;background:#120c1f;color:#eee;font-family:sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;
+background:radial-gradient(circle at 50% 45%,#2e1a52 0,#120c1f 65%)}
+.logo{position:fixed;top:5vh;left:5vh;display:flex;align-items:center;gap:1.6vh;font-size:4.2vh;font-weight:700;letter-spacing:-.02em}
+.logo svg{width:6vh;height:6vh}
+.code{font-size:18vh;font-weight:700;letter-spacing:2vh;color:#c4b5fd}
 .hint{font-size:4vh;opacity:.7}
 </style></head><body>
+<div class="logo"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#7c3aed"/><circle cx="32" cy="32" r="22" fill="none" stroke="#fff" stroke-width="3" opacity=".28"/><circle cx="32" cy="32" r="14" fill="none" stroke="#fff" stroke-width="3.5" opacity=".6"/><circle cx="32" cy="32" r="7" fill="#fff"/></svg>marquee</div>
 {{if eq .Status "active"}}
 <div class="hint">Устройството е свързано</div>
 <div class="code" style="font-size:8vh;letter-spacing:0">{{.Name}}</div>

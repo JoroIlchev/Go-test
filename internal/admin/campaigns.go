@@ -535,6 +535,13 @@ func (s *Server) approvals(w http.ResponseWriter, r *http.Request) {
 	var roots []*store.Node
 	if u.IsSuper {
 		roots = []*store.Node{nil}
+	} else if u.IsManager {
+		clients, err := s.visibleRoots(r, u)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		roots = clients
 	} else {
 		for _, role := range u.Roles {
 			if role.Role != "admin" {
@@ -576,4 +583,24 @@ func (s *Server) approvals(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// campaignSequence shows the editor the order a playlist plays in (for one
+// device and day; shuffled playlists differ between devices and days).
+func (s *Server) campaignSequence(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Spec campaign.Spec `json:"spec"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if err := in.Spec.ValidateDraft(s.loc); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	seq := in.Spec.Sequence(uint64(time.Now().UnixNano()))
+	if seq == nil {
+		seq = []int{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sequence": seq})
 }

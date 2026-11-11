@@ -10,6 +10,7 @@ import (
 
 	"marquee/internal/auth"
 	"marquee/internal/media"
+	"marquee/internal/ops"
 	"marquee/internal/store"
 )
 
@@ -90,7 +91,8 @@ func (s *Server) listMedia(w http.ResponseWriter, r *http.Request) {
 			out = append(out, s.toMediaDTO(u, m, nodeOf))
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out, "ffmpeg": s.worker.Tools().FFmpeg != ""})
+	set, _ := ops.Load(r.Context(), s.store)
+	writeJSON(w, http.StatusOK, map[string]any{"items": out, "ffmpeg": s.worker.Tools().FFmpeg != "", "prep": set.Prep()})
 }
 
 type uploadResult struct {
@@ -117,6 +119,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	nodeOf := s.nodeLookup(r)
 	results := []uploadResult{}
+	prep := "" // the hub settings unless a "prep" field comes before the files
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {
@@ -128,6 +131,15 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		}
 		filename := part.FileName()
 		if filename == "" {
+			if part.FormName() == "prep" {
+				prep, err = readPrep(part)
+				part.Close()
+				if err != nil {
+					writeErr(w, http.StatusBadRequest, "invalid processing options")
+					return
+				}
+				continue
+			}
 			part.Close()
 			continue
 		}
@@ -152,7 +164,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		}
 		name := strings.TrimSuffix(filename, filename[strings.LastIndex(filename, "."):])
 		m, err := s.store.CreateMedia(r.Context(), store.NewMedia{
-			Node: n, Name: name, Kind: kind, SHA256: sha, Ext: ext, Size: size, UploadedBy: u.ID,
+			Node: n, Name: name, Kind: kind, SHA256: sha, Ext: ext, Size: size, Prep: prep, UploadedBy: u.ID,
 		})
 		if err != nil {
 			s.fail(w, err)
@@ -165,6 +177,24 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		results = append(results, res)
 	}
 	writeJSON(w, http.StatusOK, results)
+}
+
+// readPrep reads and checks the upload's processing choice; it returns it
+// re-encoded, or "" for an empty field (= the hub settings).
+func readPrep(part io.Reader) (string, error) {
+	raw, err := io.ReadAll(io.LimitReader(part, 4096))
+	if err != nil || len(strings.TrimSpace(string(raw))) == 0 {
+		return "", err
+	}
+	var p media.Prep
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return "", err
+	}
+	if _, err := p.Options(); err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(p)
+	return string(out), err
 }
 
 // mediaFor loads the media item in the path and checks u may see it.

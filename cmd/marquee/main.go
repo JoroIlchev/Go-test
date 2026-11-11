@@ -28,6 +28,8 @@ func main() {
 		err = runService(os.Args[1:])
 	case len(os.Args) > 1 && os.Args[1] == "create-super":
 		err = createSuper(os.Args[2:])
+	case len(os.Args) > 1 && os.Args[1] == "reset-password":
+		err = resetPassword(os.Args[2:])
 	case len(os.Args) > 1 && os.Args[1] == "install-service":
 		err = installService(os.Args[2:])
 	case len(os.Args) > 1 && os.Args[1] == "uninstall-service":
@@ -101,6 +103,43 @@ func createSuper(args []string) error {
 		return err
 	}
 	fmt.Printf("super admin %s created (id %d)\n", u.Email, u.ID)
+	return nil
+}
+
+// resetPassword sets a new password for any user and lets them log in again
+// (it re-activates a deactivated account): the way back in for a super admin
+// who forgot theirs. It needs access to the server, so it is not a back door.
+func resetPassword(args []string) error {
+	fl := flag.NewFlagSet("reset-password", flag.ExitOnError)
+	email := fl.String("email", "", "e-mail of the user")
+	dataDir := fl.String("data", defaultDataDir(), "directory for the database and media")
+	fl.Parse(args)
+	if *email == "" {
+		return errors.New("-email is required")
+	}
+	ctx := context.Background()
+	st, err := store.Open(ctx, *dataDir)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	u, err := st.UserByEmail(ctx, *email)
+	if err != nil {
+		return fmt.Errorf("no user %s: %w", *email, err)
+	}
+	pw, err := readPassword()
+	if err != nil {
+		return err
+	}
+	hash, err := auth.HashPassword(pw)
+	if err != nil {
+		return err
+	}
+	active := true
+	if err := st.UpdateUser(ctx, u.ID, store.UserUpdate{PassHash: &hash, Active: &active}); err != nil {
+		return err
+	}
+	fmt.Printf("password of %s changed\n", u.Email)
 	return nil
 }
 

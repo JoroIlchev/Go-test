@@ -14,6 +14,12 @@ export interface User {
   email: string;
   name: string;
   is_super: boolean;
+  /** Hub staff working the clients below (or all of them). */
+  is_manager: boolean;
+  all_clients: boolean;
+  clients: number[];
+  can_billing: boolean;
+  can_logs: boolean;
   client_id: number | null;
   active: boolean;
   created_at: string;
@@ -54,7 +60,7 @@ export interface Tree {
 }
 
 export interface MediaWarning {
-  level: "warn" | "error";
+  level: "info" | "warn" | "error";
   code: string;
   message: string;
 }
@@ -89,6 +95,7 @@ export interface Media {
 export interface CampaignItem {
   media_id: number;
   duration_s: number;
+  every?: number; // >= 2: shown as every Nth item
 }
 
 export interface CampaignSpec {
@@ -102,6 +109,7 @@ export interface CampaignSpec {
   time_from: string;
   time_to: string;
   priority: number;
+  order?: "" | "shuffle";
 }
 
 export type CampaignState = "draft" | "pending" | "active" | "scheduled" | "expired" | "stopped";
@@ -166,7 +174,18 @@ export interface BackupResult {
   error?: string;
 }
 
-export interface HubSettings {
+export type Quality = "high" | "normal" | "small";
+
+/** How an upload is prepared for the players (see media.Prep). */
+export interface Prep {
+  image_screen: string;
+  image_quality: Quality;
+  video_auto: "off" | "problems" | "always";
+  video_max: number;
+  video_quality: Quality;
+}
+
+export interface HubSettings extends Prep {
   public_url: string;
   hub_url: string;
   hub_private: boolean;
@@ -188,6 +207,8 @@ export interface HubSettings {
   last_backup: BackupResult;
   backups: { name: string; size: number; at: string }[];
   default_poll: PollPolicy;
+  default_poll_text: string;
+  default_poll_own: boolean;
 }
 
 export interface BillingRow {
@@ -216,7 +237,7 @@ export interface UploadResult {
 }
 
 /** Uploads one file with progress; XHR because fetch has no upload progress. */
-export function uploadFile(nodeId: number, file: File, onProgress: (fraction: number) => void): Promise<UploadResult> {
+export function uploadFile(nodeId: number, file: File, onProgress: (fraction: number) => void, prep?: Prep): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/media?node_id=${nodeId}`);
@@ -237,6 +258,7 @@ export function uploadFile(nodeId: number, file: File, onProgress: (fraction: nu
     };
     xhr.onerror = () => reject(new ApiError(0, "Връзката прекъсна"));
     const fd = new FormData();
+    if (prep) fd.append("prep", JSON.stringify(prep)); // must come before the file
     fd.append("file", file, file.name);
     xhr.send(fd);
   });
@@ -283,6 +305,9 @@ const messages: Record<string, string> = {
   "ffmpeg is not available on the server": "На сървъра няма ffmpeg",
   "used in a campaign": "Файлът се използва в кампания",
   "the playlist is empty": "Плейлистът е празен",
+  "last super admin": "Това е последният активен Супер Админ: първо направете друг човек Супер Админ",
+  "kind must be super or manager": "Изберете роля",
+  "too many frequent items": "Твърде много елементи са с „по-често“: не остава място за останалите",
   "choose where the campaign plays": "Изберете къде да се излъчва кампанията",
   "end must be after start": "Краят трябва да е след началото",
   "targets must be within the campaign's node": "Може да се излъчва само в звеното на кампанията и под него",
@@ -321,6 +346,7 @@ export interface Slideshow {
   background: "blur" | "black" | "crop";
   portrait: boolean;
   text_style: TextStyle;
+  repeat_to_s?: number;
 }
 
 export interface Slide {

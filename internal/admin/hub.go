@@ -88,7 +88,10 @@ var actionLabels = map[string]string{
 	"device.update":    "Променено устройство",
 	"user.create":      "Създаден потребител",
 	"user.update":      "Променен потребител",
+	"staff.create":     "Добавен в екипа",
+	"staff.update":     "Променен член на екипа",
 	"settings.update":  "Променени настройки",
+	"settings.poll":    "Променена проверка по подразбиране",
 	"backup.run":       "Ръчно резервно копие",
 }
 

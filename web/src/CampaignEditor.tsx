@@ -17,6 +17,7 @@ interface Props {
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const kindLabel = { image: "Снимка", video: "Видео", audio: "Аудио" };
 const DEFAULT_IMAGE_S = 8;
+const EVERY = [2, 3, 4, 5, 6, 8, 10];
 
 export function CampaignEditor({ idx, id, onSelect }: Props) {
   const [c, setC] = useState<CampaignDetail | null>(null);
@@ -29,6 +30,7 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
   const [preview, setPreview] = useState(false);
   const [slideshow, setSlideshow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sequence, setSequence] = useState<number[]>([]);
 
   const apply = useCallback((d: CampaignDetail) => {
     setC(d);
@@ -55,6 +57,20 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
     const t = setInterval(() => loadLibrary(c.node_id), 3000);
     return () => clearInterval(t);
   }, [processing, c?.node_id, loadLibrary]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The order the player will use (one cycle), from the hub's own rules.
+  const seqKey = spec ? JSON.stringify([spec.items, spec.order]) : "";
+  useEffect(() => {
+    if (!spec || spec.items.length === 0) {
+      setSequence([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      api<{ sequence: number[] }>("POST", "/api/campaigns/sequence", { spec })
+        .then((r) => setSequence(r.sequence)).catch(() => setSequence(spec.items.map((_, i) => i)));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [seqKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const owner = c ? idx.byId.get(c.node_id) : undefined;
   const byId = useMemo(() => new Map(library.map((m) => [m.id, m])), [library]);
@@ -94,11 +110,13 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
     return api<CampaignDetail>("POST", `/api/campaigns/${id}/publish`);
   }, c.needs_review ? "Изпратено за одобрение." : "Публикувано. Устройствата ще го получат при следващата си проверка.");
 
-  const totalMs = spec.items.reduce((s, it) => {
+  const itemMs = (it: CampaignSpec["items"][number]) => {
     const m = byId.get(it.media_id);
-    if (!m) return s;
-    return s + (m.kind === "image" ? (it.duration_s || DEFAULT_IMAGE_S) * 1000 : it.duration_s ? it.duration_s * 1000 : m.duration_ms);
-  }, 0);
+    if (!m) return 0;
+    return m.kind === "image" ? (it.duration_s || DEFAULT_IMAGE_S) * 1000 : it.duration_s ? it.duration_s * 1000 : m.duration_ms;
+  };
+  const seq = sequence.filter((i) => i < spec.items.length);
+  const totalMs = seq.reduce((s, i) => s + itemMs(spec.items[i]), 0);
 
   const pending = c.versions.find((v) => v.status === "pending");
 
@@ -161,13 +179,20 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
           <div className="title-row">
             <h3>Плейлист</h3>
             <span className="spacer" />
-            <span className="muted small">{spec.items.length} елемента · цикъл {formatDuration(totalMs)}</span>
+            <span className="muted small">{spec.items.length} елемента · цикъл {seq.length > spec.items.length && `${seq.length} показвания, `}{formatDuration(totalMs)}</span>
             {editable && spec.items.some((it) => byId.get(it.media_id)?.kind === "image") && (
               <button className="ghost" onClick={() => setSlideshow(true)} title="Слива снимките в едно видео с плавни преходи">🎬 Направи видео</button>
             )}
           </div>
           <Playlist spec={spec} byId={byId} editable={editable} onChange={(items) => set({ items })} />
+          <SequenceStrip spec={spec} seq={seq} byId={byId} />
           <div className="grid2" style={{ marginTop: 12 }}>
+            <label>Ред на излъчване
+              <select value={spec.order ?? ""} disabled={!editable} onChange={(e) => set({ order: e.target.value as CampaignSpec["order"] })}>
+                <option value="">По реда в списъка</option>
+                <option value="shuffle">Разбъркан (всеки ден различен, на всяко устройство различен)</option>
+              </select>
+            </label>
             <label>Фонова музика
               <select value={spec.audio_id ?? 0} disabled={!editable} onChange={(e) => set({ audio_id: Number(e.target.value) || undefined })}>
                 <option value={0}>Без музика</option>
@@ -241,7 +266,7 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
           }} />
       )}
 
-      {preview && <PreviewPlayer spec={spec} byId={byId} onClose={() => setPreview(false)} />}
+      {preview && <PreviewPlayer spec={spec} seq={seq} byId={byId} onClose={() => setPreview(false)} />}
     </section>
   );
 }
@@ -285,6 +310,11 @@ function Playlist({ spec, byId, editable, onChange }: {
                   onChange={(e) => onChange(items.map((x, j) => (j === i ? { ...x, duration_s: Number(e.target.value) } : x)))} /> сек
               </label>
             ) : <span className="dur muted small">до края</span>}
+            <select className="every" value={it.every ?? 0} disabled={!editable} title="Колко често се показва"
+              onChange={(e) => onChange(items.map((x, j) => (j === i ? { ...x, every: Number(e.target.value) || undefined } : x)))}>
+              <option value={0}>веднъж в цикъла</option>
+              {EVERY.map((n) => <option key={n} value={n}>всеки {n}-{n === 2 ? "ри" : n <= 4 ? "ти" : "и"}</option>)}
+            </select>
             {editable && (
               <span className="pl-actions">
                 <button className="ghost icon" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label="Нагоре">↑</button>
@@ -296,6 +326,33 @@ function Playlist({ spec, byId, editable, onChange }: {
         );
       })}
     </ol>
+  );
+}
+
+/** One cycle of the playlist the way the player shows it. */
+function SequenceStrip({ spec, seq, byId }: { spec: CampaignSpec; seq: number[]; byId: Map<number, Media> }) {
+  const special = spec.order === "shuffle" || spec.items.some((it) => (it.every ?? 0) >= 2);
+  if (!special || seq.length === 0) return null;
+  const shown = seq.slice(0, 60);
+  return (
+    <div className="seq-strip">
+      <div className="muted small">
+        Ред на излъчване (един цикъл{spec.order === "shuffle" ? ", пример — всяко устройство има свой ред всеки ден" : ""}):
+      </div>
+      <div className="seq-row">
+        {shown.map((i, k) => {
+          const it = spec.items[i];
+          const m = it && byId.get(it.media_id);
+          return (
+            <span key={k} className={"seq-cell" + ((it?.every ?? 0) >= 2 ? " focus" : "")} title={m?.name}>
+              {m?.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" /> : <span>{i + 1}</span>}
+              <small>{i + 1}</small>
+            </span>
+          );
+        })}
+        {seq.length > shown.length && <span className="muted small">… още {seq.length - shown.length}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -425,8 +482,9 @@ function ReviewBox({ v, busy, onReview }: { v: CampaignVersion; busy: boolean; o
 }
 
 /** Plays the playlist in the browser roughly the way the player will. */
-function PreviewPlayer({ spec, byId, onClose }: { spec: CampaignSpec; byId: Map<number, Media>; onClose: () => void }) {
-  const items = spec.items.filter((it) => byId.get(it.media_id)?.status === "ready");
+function PreviewPlayer({ spec, seq, byId, onClose }: { spec: CampaignSpec; seq: number[]; byId: Map<number, Media>; onClose: () => void }) {
+  const items = (seq.length ? seq : spec.items.map((_, i) => i)).map((i) => spec.items[i])
+    .filter((it) => byId.get(it.media_id)?.status === "ready");
   const [i, setI] = useState(0);
   const next = useCallback(() => setI((x) => (items.length ? (x + 1) % items.length : 0)), [items.length]);
   const it = items[i];

@@ -131,16 +131,22 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 	s.mux.Handle("POST /api/campaigns/{id}/versions/{vid}/review", s.authed(s.reviewVersion))
 	s.mux.Handle("POST /api/campaigns/{id}/live", s.authed(s.setLive))
 	s.mux.Handle("DELETE /api/campaigns/{id}", s.authed(s.deleteCampaign))
+	s.mux.Handle("POST /api/campaigns/sequence", s.authed(s.campaignSequence))
 	s.mux.Handle("GET /api/approvals", s.authed(s.approvals))
 
 	s.mux.Handle("GET /api/nodes/{id}/poll", s.authed(s.nodePoll))
 	s.mux.Handle("PUT /api/nodes/{id}/poll", s.authed(s.setNodePoll))
+	s.mux.Handle("PUT /api/settings/poll", s.superOnly(s.setDefaultPoll))
 	s.mux.Handle("GET /api/settings", s.superOnly(s.getSettings))
 	s.mux.Handle("PUT /api/settings", s.superOnly(s.putSettings))
 	s.mux.Handle("POST /api/settings/test-mail", s.superOnly(s.testMail))
 	s.mux.Handle("POST /api/backups", s.superOnly(s.backupNow))
-	s.mux.Handle("GET /api/billing", s.superOnly(s.billing))
-	s.mux.Handle("GET /api/logs", s.superOnly(s.viewLogs))
+	s.mux.Handle("GET /api/billing", s.staffWith(func(u *store.User) bool { return u.CanBilling })(s.billing))
+	s.mux.Handle("GET /api/logs", s.staffWith(func(u *store.User) bool { return u.CanLogs })(s.viewLogs))
+
+	s.mux.Handle("GET /api/staff", s.superOnly(s.listStaff))
+	s.mux.Handle("POST /api/staff", s.superOnly(s.createStaff))
+	s.mux.Handle("PATCH /api/staff/{id}", s.superOnly(s.updateStaff))
 
 	s.mux.Handle("/", spaHandler(web))
 	return s

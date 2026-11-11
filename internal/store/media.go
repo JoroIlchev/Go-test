@@ -30,6 +30,7 @@ type Media struct {
 	SourceID   sql.NullInt64 `json:"-"`
 	UploadedBy sql.NullInt64 `json:"-"`
 	Recipe     string        `json:"-"`
+	Prep       string        `json:"-"`
 	CreatedAt  string        `json:"created_at"`
 }
 
@@ -37,13 +38,13 @@ type Media struct {
 func (m *Media) FileName() string { return m.SHA256 + "." + m.Ext }
 
 const mediaCols = `id, node_id, client_id, name, kind, sha256, ext, size, width, height, duration_ms,
-	video_codec, audio_codec, fps, bitrate, status, warnings, error, has_thumb, source_id, uploaded_by, recipe, created_at`
+	video_codec, audio_codec, fps, bitrate, status, warnings, error, has_thumb, source_id, uploaded_by, recipe, prep, created_at`
 
 func scanMedia(row interface{ Scan(...any) error }) (*Media, error) {
 	var m Media
 	err := row.Scan(&m.ID, &m.NodeID, &m.ClientID, &m.Name, &m.Kind, &m.SHA256, &m.Ext, &m.Size, &m.Width,
 		&m.Height, &m.DurationMS, &m.VideoCodec, &m.AudioCodec, &m.FPS, &m.Bitrate, &m.Status, &m.Warnings,
-		&m.Error, &m.HasThumb, &m.SourceID, &m.UploadedBy, &m.Recipe, &m.CreatedAt)
+		&m.Error, &m.HasThumb, &m.SourceID, &m.UploadedBy, &m.Recipe, &m.Prep, &m.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -106,6 +107,7 @@ type NewMedia struct {
 	Size       int64
 	SourceID   int64
 	Recipe     string
+	Prep       string
 	UploadedBy int64
 }
 
@@ -118,9 +120,9 @@ func (s *Store) CreateMedia(ctx context.Context, nm NewMedia) (*Media, error) {
 		by = nm.UploadedBy
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO media (node_id, client_id, name, kind, sha256, ext, size, source_id, recipe, uploaded_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		nm.Node.ID, nm.Node.ClientID, strings.TrimSpace(nm.Name), nm.Kind, nm.SHA256, nm.Ext, nm.Size, source, nm.Recipe, by)
+		`INSERT INTO media (node_id, client_id, name, kind, sha256, ext, size, source_id, recipe, prep, uploaded_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		nm.Node.ID, nm.Node.ClientID, strings.TrimSpace(nm.Name), nm.Kind, nm.SHA256, nm.Ext, nm.Size, source, nm.Recipe, nm.Prep, by)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +133,7 @@ func (s *Store) CreateMedia(ctx context.Context, nm NewMedia) (*Media, error) {
 // MediaProbe is what processing learns about a file.
 type MediaProbe struct {
 	SHA256     string
+	Ext        string // "" keeps the item's extension
 	Size       int64
 	Width      int
 	Height     int
@@ -145,10 +148,10 @@ type MediaProbe struct {
 
 func (s *Store) MarkMediaReady(ctx context.Context, id int64, p MediaProbe) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE media SET status = 'ready', error = '', sha256 = ?, size = ?, width = ?, height = ?,
+		`UPDATE media SET status = 'ready', error = '', sha256 = ?, ext = COALESCE(NULLIF(?, ''), ext), size = ?, width = ?, height = ?,
 		 duration_ms = ?, video_codec = ?, audio_codec = ?, fps = ?, bitrate = ?, warnings = ?, has_thumb = ?
 		 WHERE id = ?`,
-		p.SHA256, p.Size, p.Width, p.Height, p.DurationMS, p.VideoCodec, p.AudioCodec, p.FPS, p.Bitrate,
+		p.SHA256, p.Ext, p.Size, p.Width, p.Height, p.DurationMS, p.VideoCodec, p.AudioCodec, p.FPS, p.Bitrate,
 		p.Warnings, p.HasThumb, id)
 	return err
 }
@@ -178,6 +181,13 @@ func (s *Store) DeleteMedia(ctx context.Context, m *Media) (orphan bool, err err
 	var n int
 	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media WHERE sha256 = ?`, m.SHA256).Scan(&n)
 	return n == 0, err
+}
+
+// BlobInUse reports whether any item still points at the blob.
+func (s *Store) BlobInUse(ctx context.Context, sha, ext string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media WHERE sha256 = ? AND ext = ?`, sha, ext).Scan(&n)
+	return n > 0, err
 }
 
 // MediaFileExists reports whether any item serves this blob, so players can

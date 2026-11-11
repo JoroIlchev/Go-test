@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,6 +23,10 @@ type Slideshow struct {
 	Background  string    `json:"background"`   // blur | black | crop
 	Portrait    bool      `json:"portrait"`     // 1080x1920 instead of 1920x1080
 	Text        TextStyle `json:"text_style"`
+	// RepeatToS repeats the whole show inside the file until it lasts at
+	// least this long: a player restarting a short clip over and over shows a
+	// black flash each time and, on some players, slowly runs out of memory.
+	RepeatToS int `json:"repeat_to_s,omitempty"`
 }
 
 type Slide struct {
@@ -57,6 +62,16 @@ var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 const maxTextRunes = 300
 
+// Loops is how many extra times the show repeats inside the file to last
+// at least RepeatToS.
+func (sh Slideshow) Loops() int {
+	total := sh.TotalS()
+	if sh.RepeatToS <= 0 || total <= 0 || float64(sh.RepeatToS) <= total {
+		return 0
+	}
+	return int(math.Ceil(float64(sh.RepeatToS)/total)) - 1
+}
+
 // HasText reports whether any slide carries a caption.
 func (sh Slideshow) HasText() bool {
 	for _, it := range sh.Items {
@@ -77,6 +92,7 @@ const (
 	maxSlides       = 200
 	maxSlideS       = 120
 	maxSlideshowS   = 30 * 60
+	maxRepeatToS    = 10 * 60
 	maxTransitionS  = 3.0
 	slideshowFPS    = 30
 	edgeFadeS       = 0.5
@@ -119,6 +135,9 @@ func (sh *Slideshow) Normalize() error {
 		return fmt.Errorf("invalid transition %q", sh.Transition)
 	} else if sh.TransitionS <= 0 {
 		sh.TransitionS = 1
+	}
+	if sh.RepeatToS < 0 || sh.RepeatToS > maxRepeatToS {
+		return fmt.Errorf("repeat up to %d s", maxRepeatToS)
 	}
 	if sh.TransitionS > maxTransitionS {
 		return fmt.Errorf("transition longer than %gs", maxTransitionS)
@@ -247,7 +266,9 @@ func (sh Slideshow) Job(images []string, audio, out string) Job {
 			name := fmt.Sprintf("t%d.txt", i)
 			files[name] = sh.caption(&g, name, it, w, h)
 		}
-		fmt.Fprintf(&g, ",fps=%d,settb=1/%d,setsar=1,format=yuv420p[s%d];\n", slideshowFPS, slideshowFPS, i)
+		// Photos decode as full-range ("yuvj") colour; players expect limited range.
+		fmt.Fprintf(&g, ",fps=%d,settb=1/%d,setsar=1,scale=out_range=tv:out_color_matrix=bt709,format=yuv420p[s%d];\n",
+			slideshowFPS, slideshowFPS, i)
 	}
 
 	last := "[s0]"
@@ -285,8 +306,8 @@ func (sh Slideshow) Job(images []string, audio, out string) Job {
 	args = append(args,
 		"-c:v", "libx264", "-preset", "medium", "-crf", "20",
 		"-profile:v", "high", "-level:v", "4.1", "-pix_fmt", "yuv420p",
-		"-r", strconv.Itoa(slideshowFPS), "-g", strconv.Itoa(2*slideshowFPS),
-		"-t", num(total), "-movflags", "+faststart", out)
+		"-r", strconv.Itoa(slideshowFPS), "-g", strconv.Itoa(2*slideshowFPS))
+	args = append(append(args, colorArgs()...), "-t", num(total), "-movflags", "+faststart", out)
 	return Job{Args: args, Files: files}
 }
 

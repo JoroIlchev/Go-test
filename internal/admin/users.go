@@ -41,10 +41,14 @@ func checkRoles(actor *store.User, roles []store.Role, clientID int64, nodeOf fu
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	var clientID int64
-	if u.IsSuper {
+	if auth.Staff(u) {
 		id, err := strconv.ParseInt(r.URL.Query().Get("client_id"), 10, 64)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, "client_id required")
+			return
+		}
+		if !auth.ManagesClient(u, id) {
+			forbidden(w)
 			return
 		}
 		clientID = id
@@ -80,9 +84,9 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var clientID int64
 	switch {
-	case u.IsSuper && in.ClientID != nil:
+	case auth.Staff(u) && in.ClientID != nil:
 		clientID = *in.ClientID
-	case !u.IsSuper && u.ClientID.Valid:
+	case !auth.Staff(u) && u.ClientID.Valid:
 		clientID = u.ClientID.Int64
 	default:
 		writeErr(w, http.StatusBadRequest, "client_id required")
@@ -149,7 +153,7 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Roles != nil {
-		if target.IsSuper || len(in.Roles) == 0 ||
+		if auth.Staff(target) || len(in.Roles) == 0 ||
 			!checkRoles(u, in.Roles, target.ClientID.Int64, nodeOf) {
 			forbidden(w)
 			return

@@ -5,8 +5,10 @@
   --border: #e2e5ea;
   --text: #1c2230;
   --muted: #6b7385;
-  --accent: #c2410c;
-  --accent-soft: #fff1e8;
+  --brand: #7c3aed;
+  --accent: #6d28d9;
+  --accent-soft: #f3eefe;
+  --on-accent: #ffffff;
   --danger: #b42318;
   --ok: #157f3b;
   --online: #22a55a;
@@ -24,8 +26,9 @@
     --border: #2e3442;
     --text: #e6e9ef;
     --muted: #9aa3b5;
-    --accent: #fb923c;
-    --accent-soft: #3a2416;
+    --accent: #a78bfa;
+    --accent-soft: #2b2142;
+    --on-accent: #1a1030;
     --danger: #f87171;
     --ok: #4ade80;
     color-scheme: dark;
@@ -45,7 +48,11 @@ h4 { margin: 0 0 12px; }
 button, input, select { font: inherit; color: inherit; }
 code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
 
-.brand { font-weight: 800; letter-spacing: .02em; color: var(--accent); font-size: 18px; margin: 0; }
+.brand { margin: 0; line-height: 1; }
+.logo { display: inline-flex; align-items: center; gap: .45em; }
+.logo-mark { flex: none; display: block; }
+.logo-word { font-family: "Space Grotesk", system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.login .brand { display: flex; justify-content: center; margin-bottom: 6px; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .strong { font-weight: 700; }
@@ -83,7 +90,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
 /* Buttons */
 button { cursor: pointer; border-radius: 8px; border: 1px solid transparent; padding: 7px 14px; background: none; }
 button:disabled { opacity: .6; cursor: default; }
-.primary { background: var(--accent); color: #fff; font-weight: 600; }
+.primary { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .ghost { border-color: var(--border); background: var(--surface); }
 .ghost:hover { background: var(--surface-2); }
 .danger { color: var(--danger); }
@@ -169,6 +176,9 @@ legend { padding: 0 6px; color: var(--muted); font-size: 13px; }
 }
 .dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
 .notice { padding: 10px 14px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }
+details.prep { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+details.prep summary { cursor: pointer; }
+details.prep[open] summary { margin-bottom: 4px; }
 .uploads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .uploads li { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(80px, 200px) auto; gap: 10px; align-items: center; }
 .uploads .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -199,6 +209,7 @@ legend { padding: 0 6px; color: var(--muted); font-size: 13px; }
 @keyframes pulse { 50% { opacity: .5; } }
 .warnings { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
 .warnings li.error { color: var(--danger); }
+.warnings li.info { color: var(--muted); list-style: "ⓘ "; }
 .card-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
 .small-btn { padding: 4px 10px; font-size: 12px; }
 .btn-link { text-decoration: none; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); color: inherit; }
@@ -306,3 +317,15 @@ details.small { margin-top: 10px; }
 .log-line.lv-warn { color: #b26b00; }
 .log-line.lv-error { color: var(--danger); font-weight: 600; }
 @media (prefers-color-scheme: dark) { .log-line.lv-warn { color: #f5b04a; } }
+
+/* Playlist frequency and the play order strip */
+.playlist select.every { width: auto; font-size: 12px; padding: 2px 4px; }
+.seq-strip { margin-top: 10px; }
+.seq-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+.seq-cell { position: relative; width: 44px; height: 30px; border-radius: 4px; overflow: hidden; background: var(--surface-2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px; border: 2px solid transparent; }
+.seq-cell img { width: 100%; height: 100%; object-fit: cover; }
+.seq-cell small { position: absolute; right: 2px; bottom: 0; font-size: 9px; color: #fff; text-shadow: 0 0 2px #000; }
+.seq-cell.focus { border-color: var(--accent); }
+
+.client-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; margin: 6px 0; }

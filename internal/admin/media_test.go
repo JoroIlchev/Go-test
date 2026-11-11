@@ -32,6 +32,7 @@ type mediaItem struct {
 	Width       int
 	Height      int
 	VideoCodec  string `json:"video_codec"`
+	DurationMS  int64  `json:"duration_ms"`
 	HasThumb    bool   `json:"has_thumb"`
 	OwnerName   string `json:"owner_name"`
 	CanEdit     bool   `json:"can_edit"`
@@ -45,8 +46,21 @@ func (c *client) upload(nodeID int64, filename string, data []byte) (int, []stru
 	Error string
 }) {
 	c.e.t.Helper()
+	return c.uploadWith(nodeID, filename, data, "")
+}
+
+// uploadWith sends the file with a processing choice (JSON of media.Prep).
+func (c *client) uploadWith(nodeID int64, filename string, data []byte, prep string) (int, []struct {
+	Name  string
+	Media *mediaItem
+	Error string
+}) {
+	c.e.t.Helper()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
+	if prep != "" {
+		mw.WriteField("prep", prep)
+	}
 	fw, _ := mw.CreateFormFile("file", filename)
 	fw.Write(data)
 	mw.Close()

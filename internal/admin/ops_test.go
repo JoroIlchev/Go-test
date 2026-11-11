@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"marquee/internal/campaign"
+	"marquee/internal/ops"
 	"marquee/internal/player"
+	"marquee/internal/poll"
 	"marquee/internal/store"
 )
 
@@ -240,4 +242,52 @@ func mustNodePtr(t *testing.T, e *env, id int64) *store.Node {
 		t.Fatal(err)
 	}
 	return n
+}
+
+// The hub-wide check schedule comes from the settings; a client's own wins.
+func TestDefaultPollFromSettings(t *testing.T) {
+	e := newEnv(t)
+	root := e.login("root@hub")
+	ivanov := root.mustNode(nil, "client", "Ivanov")
+	cafe := root.mustNode(p(ivanov), "site", "Cafe")
+	dev, _ := e.st.RegisterDevice(context.Background(), "uuid-d", "", "", "")
+	root.do("POST", "/api/devices/pair", map[string]any{"code": dev.PairingCode, "site_id": cafe, "name": "Bar"}, nil)
+	ph := httptest.NewServer(player.New(e.st, mustStorage(e), slog.New(slog.NewTextHandler(io.Discard, nil)),
+		player.Config{RefreshSec: 900, DefaultPoll: func(ctx context.Context) poll.Policy {
+			p, _ := ops.DefaultPoll(ctx, e.st, poll.Interval(15*time.Minute))
+			return p
+		}}))
+	defer ph.Close()
+	refresh := func() string {
+		req, _ := http.NewRequest("GET", ph.URL+"/p/index.smil", nil)
+		req.Header.Set("User-Agent", "GAPI/1.0 (UUID:uuid-d; NAME:x) player/1.0 (MODEL:box)")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return regexp.MustCompile(`Refresh" content="(\d+)"`).FindStringSubmatch(string(b))[1]
+	}
+
+	var set struct {
+		Text string `json:"default_poll_text"`
+		Own  bool   `json:"default_poll_own"`
+	}
+	five := map[string]any{"policy": map[string]any{"mode": "interval", "minutes": 5}}
+	if code, body := root.do("PUT", "/api/settings/poll", five, &set); code != 200 || !set.Own {
+		t.Fatalf("set default: %d %s", code, body)
+	}
+	if got := refresh(); got != "300" {
+		t.Fatalf("refresh %s, want 300", got)
+	}
+	root.do("PUT", "/api/nodes/"+itoa(ivanov)+"/poll", map[string]any{"policy": map[string]any{"mode": "interval", "minutes": 30}}, nil)
+	if got := refresh(); got != "1800" {
+		t.Fatalf("client's own: refresh %s, want 1800", got)
+	}
+	root.do("PUT", "/api/nodes/"+itoa(ivanov)+"/poll", map[string]any{"policy": nil}, nil)
+	root.do("PUT", "/api/settings/poll", map[string]any{"policy": nil}, &set)
+	if got := refresh(); set.Own || got != "900" {
+		t.Fatalf("back to -refresh: %s %+v", got, set)
+	}
 }

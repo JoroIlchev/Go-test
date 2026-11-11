@@ -40,7 +40,8 @@ func (s *Server) nodePoll(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	eff, from := poll.Resolve(chain, set, s.defaultPoll)
+	def, _ := ops.DefaultPoll(r.Context(), s.store, s.defaultPoll)
+	eff, from := poll.Resolve(chain, set, def)
 	out := pollDTO{Effective: eff, Description: eff.Describe(), FromNodeID: from, CanEdit: auth.Can(u, n, auth.PermAdmin)}
 	if from == n.ID {
 		out.Own = &eff
@@ -85,6 +86,27 @@ func (s *Server) setNodePoll(w http.ResponseWriter, r *http.Request) {
 	s.nodePoll(w, r)
 }
 
+// setDefaultPoll changes how often devices check where no node above them
+// has its own schedule; null returns to the -refresh value.
+func (s *Server) setDefaultPoll(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Policy *poll.Policy `json:"policy"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if err := ops.SetDefaultPoll(r.Context(), s.store, in.Policy); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	detail := "по подразбиране (-refresh)"
+	if in.Policy != nil {
+		detail = in.Policy.Describe()
+	}
+	s.audit(r, "settings.poll", 0, detail)
+	s.getSettings(w, r)
+}
+
 func (s *Server) pathNode(w http.ResponseWriter, r *http.Request) *store.Node {
 	id, ok := pathID(r)
 	if !ok {
@@ -97,6 +119,19 @@ func (s *Server) pathNode(w http.ResponseWriter, r *http.Request) *store.Node {
 		return nil
 	}
 	return n
+}
+
+// staffWith wraps pages a manager sees only with the given option.
+func (s *Server) staffWith(allowed func(u *store.User) bool) func(http.HandlerFunc) http.Handler {
+	return func(h http.HandlerFunc) http.Handler {
+		return s.authed(func(w http.ResponseWriter, r *http.Request) {
+			if u := userFrom(r); !u.IsSuper && !(u.IsManager && allowed(u)) {
+				forbidden(w)
+				return
+			}
+			h(w, r)
+		})
+	}
 }
 
 // superOnly wraps hub-wide endpoints.
@@ -117,6 +152,8 @@ type settingsDTO struct {
 	LastBackup  ops.BackupResult `json:"last_backup"`
 	Backups     []ops.BackupFile `json:"backups"`
 	Default     poll.Policy      `json:"default_poll"`
+	DefaultText string           `json:"default_poll_text"`
+	DefaultOwn  bool             `json:"default_poll_own"` // set here, not by -refresh
 	// The hub address in device links: what is used now, the candidates on
 	// this machine, and whether a command-line flag fixes it.
 	HubURL      string   `json:"hub_url"`
@@ -131,7 +168,8 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	out := settingsDTO{Settings: set, HasPassword: set.SMTPPass != "", Default: s.defaultPoll,
+	def, own := ops.DefaultPoll(r.Context(), s.store, s.defaultPoll)
+	out := settingsDTO{Settings: set, HasPassword: set.SMTPPass != "", Default: def, DefaultText: def.Describe(), DefaultOwn: own,
 		HubURL: s.hubURL(r.Context()), Detected: s.detectedURLs(), HubURLFixed: s.publicURL != ""}
 	out.HubPrivate = ops.IsPrivate(out.HubURL)
 	out.SMTPPass = ""
@@ -242,7 +280,11 @@ func (s *Server) billing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows := []usageRow{}
+	u := userFrom(r)
 	for _, c := range clients {
+		if !auth.ManagesClient(u, c.ID) {
+			continue
+		}
 		row := usageRow{Usage: ops.Usage{ClientID: c.ID}, Name: c.Name}
 		if u := usage[c.ID]; u != nil {
 			row.Usage = *u

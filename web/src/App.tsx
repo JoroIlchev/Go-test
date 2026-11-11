@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Logo } from "./Logo";
 import { api, ApiError, type Approval, type Device, type Tree, type User } from "./api";
 import { CampaignEditor } from "./CampaignEditor";
 import { ApprovalsPanel } from "./ApprovalsPanel";
-import { TreeIndex } from "./model";
+import { isStaff, TreeIndex } from "./model";
+import { TeamPanel } from "./TeamPanel";
 import { Login } from "./Login";
 import { Sidebar } from "./Sidebar";
 import { NodePanel } from "./NodePanel";
@@ -23,6 +25,7 @@ export type Selection =
   | { type: "settings" }
   | { type: "billing" }
   | { type: "logs" }
+  | { type: "team" }
   | null;
 
 export function App() {
@@ -36,24 +39,27 @@ export function App() {
 
   if (me === undefined) return null;
   if (me === null) return <Login onLogin={setMe} />;
-  return <Shell me={me} onLogout={() => setMe(null)} />;
+  return <Shell me={me} onMe={setMe} onLogout={() => setMe(null)} />;
 }
 
-function Shell({ me, onLogout }: { me: User; onLogout: () => void }) {
+function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLogout: () => void }) {
   const [tree, setTree] = useState<Tree | null>(null);
   const [pending, setPending] = useState<Device[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [sel, setSel] = useState<Selection>(null);
 
+  const staff = isStaff(me);
   const reload = useCallback(async () => {
     try {
+      // Rights change under us: a new client of a manager, the team page.
+      onMe(await api<User>("GET", "/api/me"));
       setTree(await api<Tree>("GET", "/api/tree"));
       setApprovals(await api<Approval[]>("GET", "/api/approvals"));
-      if (me.is_super) setPending(await api<Device[]>("GET", "/api/devices/pending"));
+      if (staff) setPending(await api<Device[]>("GET", "/api/devices/pending"));
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) onLogout();
     }
-  }, [me.is_super, onLogout]);
+  }, [staff, onMe, onLogout]);
 
   useEffect(() => {
     reload();
@@ -81,25 +87,27 @@ function Shell({ me, onLogout }: { me: User; onLogout: () => void }) {
       main = <CampaignEditor key={sel.id} me={me} idx={idx} id={sel.id} onSelect={(s) => { setSel(s); reload(); }} />;
     } else if (sel.type === "approvals") {
       main = <ApprovalsPanel approvals={approvals} onSelect={setSel} />;
-    } else if (sel.type === "pending" && me.is_super) {
+    } else if (sel.type === "pending" && staff) {
       main = <PendingPanel idx={idx} pending={pending} hubUrl={tree.hub_url} serverTime={tree.server_time} onChange={reload} onSelect={setSel} />;
-    } else if (sel.type === "new-client" && me.is_super) {
+    } else if (sel.type === "new-client" && staff) {
       main = <NewClientPanel onChange={reload} onSelect={setSel} />;
     } else if (sel.type === "settings" && me.is_super) {
       main = <SettingsPanel />;
-    } else if (sel.type === "billing" && me.is_super) {
+    } else if (sel.type === "billing" && (me.is_super || me.can_billing)) {
       main = <BillingPanel />;
-    } else if (sel.type === "logs" && me.is_super) {
+    } else if (sel.type === "logs" && (me.is_super || me.can_logs)) {
       main = <LogsPanel />;
+    } else if (sel.type === "team" && me.is_super) {
+      main = <TeamPanel me={me} clients={idx.children.get(null) ?? []} onMeChange={reload} />;
     }
   }
 
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">marquee</span>
+        <span className="brand"><Logo size={28} /></span>
         <span className="spacer" />
-        <span className="who">{me.name || me.email}{me.is_super && <span className="badge">супер админ</span>}</span>
+        <span className="who">{me.name || me.email}{me.is_super && <span className="badge">Супер Админ</span>}{me.is_manager && <span className="badge">Мениджър</span>}</span>
         <button className="ghost" onClick={logout}>Изход</button>
       </header>
       <aside className="sidebar">
