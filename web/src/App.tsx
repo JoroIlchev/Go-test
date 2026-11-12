@@ -46,7 +46,10 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
   const [tree, setTree] = useState<Tree | null>(null);
   const [pending, setPending] = useState<Device[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [sel, setSel] = useState<Selection>(null);
+  const [sel, setSelection] = useState<Selection>(null);
+  // On a phone the tree is a drawer: open until something is picked.
+  const [menu, setMenu] = useState(true);
+  const setSel = useCallback((s: Selection) => { setSelection(s); setMenu(false); }, []);
 
   const staff = isStaff(me);
   const reload = useCallback(async () => {
@@ -75,7 +78,12 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
     onLogout();
   }
 
-  let main = <div className="empty">Изберете звено от дървото вляво.</div>;
+  let main = (
+    <div className="empty">
+      Изберете звено от дървото вляво.
+      <p className="phone-only"><button className="primary" onClick={() => setMenu(true)}>Отвори менюто</button></p>
+    </div>
+  );
   if (idx && tree && sel) {
     if (sel.type === "node" && idx.byId.has(sel.id)) {
       main = <NodePanel key={sel.id} me={me} idx={idx} node={idx.byId.get(sel.id)!} serverTime={tree.server_time}
@@ -103,13 +111,15 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
   }
 
   return (
-    <div className="shell">
+    <div className={"shell" + (menu ? " menu-open" : "")}>
       <header className="topbar">
+        <button className="ghost icon menu-btn" onClick={() => setMenu(!menu)} aria-label="Меню" aria-expanded={menu}>☰</button>
         <span className="brand"><Logo size={28} /></span>
         <span className="spacer" />
-        <span className="who">{me.name || me.email}{me.is_super && <span className="badge">Супер Админ</span>}{me.is_manager && <span className="badge">Мениджър</span>}</span>
+        <span className="who"><span className="who-name">{me.name || me.email}</span>{me.is_super && <span className="badge">Супер Админ</span>}{me.is_manager && <span className="badge">Мениджър</span>}</span>
         <button className="ghost" onClick={logout}>Изход</button>
       </header>
+      <div className="menu-back" onClick={() => setMenu(false)} />
       <aside className="sidebar">
         {idx && <Sidebar me={me} idx={idx} pendingCount={pending.length} approvalCount={approvals.length} sel={sel} onSelect={setSel}
           serverTime={tree!.server_time} />}

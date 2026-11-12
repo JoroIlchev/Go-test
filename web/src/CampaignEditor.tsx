@@ -293,13 +293,24 @@ function Playlist({ spec, byId, editable, onChange }: {
         const m = byId.get(it.media_id);
         return (
           <li key={i} className={over === i ? "over" : ""} draggable={editable}
-            onDragStart={() => { dragFrom.current = i; }}
-            onDragOver={(e) => { e.preventDefault(); setOver(i); }}
-            onDragLeave={() => setOver(null)}
-            onDrop={(e) => { e.preventDefault(); setOver(null); if (dragFrom.current !== null) move(dragFrom.current, i); dragFrom.current = null; }}>
+            onDragStart={(e) => {
+              dragFrom.current = i;
+              // Without data some browsers (Firefox) never start the drag.
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", String(i));
+            }}
+            onDragEnter={(e) => { if (dragFrom.current !== null) e.preventDefault(); }}
+            onDragOver={(e) => {
+              if (dragFrom.current === null) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (over !== i) setOver(i);
+            }}
+            onDrop={(e) => { e.preventDefault(); setOver(null); if (dragFrom.current !== null) move(dragFrom.current, i); dragFrom.current = null; }}
+            onDragEnd={() => { dragFrom.current = null; setOver(null); }}>
             {editable && <span className="grip" title="Влачете за пренареждане">⋮⋮</span>}
             <span className="pl-num">{i + 1}</span>
-            <span className="pl-thumb">{m?.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" /> : "▶"}</span>
+            <span className="pl-thumb">{m?.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" draggable={false} /> : "▶"}</span>
             <span className="pl-name">
               {m?.name ?? `#${it.media_id}`}
               <span className="muted small"> {m ? kindLabel[m.kind] : ""}{m?.kind === "video" && m.duration_ms > 0 && ` · ${formatDuration(m.duration_ms)}`}</span>
@@ -345,7 +356,7 @@ function SequenceStrip({ spec, seq, byId }: { spec: CampaignSpec; seq: number[];
           const m = it && byId.get(it.media_id);
           return (
             <span key={k} className={"seq-cell" + ((it?.every ?? 0) >= 2 ? " focus" : "")} title={m?.name}>
-              {m?.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" /> : <span>{i + 1}</span>}
+              {m?.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" draggable={false} /> : <span>{i + 1}</span>}
               <small>{i + 1}</small>
             </span>
           );

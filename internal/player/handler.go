@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -153,8 +154,14 @@ func (h *Handler) serveIndex(w http.ResponseWriter, r *http.Request, d *store.De
 	}
 	// Pending devices show their pairing code; active ones without any
 	// scheduled campaign show "connected, waiting for content".
+	// Some players open the page in a WebView that sends its own User-Agent, not
+	// the player's, so on the shared URL the page names the device itself.
+	page := "pair.html"
+	if r.PathValue("token") == "" && a.UUID != "" {
+		page += "?u=" + url.QueryEscape(a.UUID)
+	}
 	h.setNextCheck(r, d, now, refresh)
-	serveVersioned(w, r, "application/smil+xml", statusSMIL(refresh))
+	serveVersioned(w, r, "application/smil+xml", statusSMIL(refresh, page))
 }
 
 func (h *Handler) setNextCheck(r *http.Request, d *store.Device, now time.Time, refresh int) {
@@ -186,8 +193,11 @@ func (h *Handler) pairPage(w http.ResponseWriter, r *http.Request) {
 	if tok := r.PathValue("token"); tok != "" {
 		d, err = h.store.DeviceByToken(r.Context(), tok)
 	} else {
-		d, err = h.store.DeviceByUUID(r.Context(),
-			parseAgent(r.UserAgent(), r.Header.Get("X-Signage-Agent")).UUID)
+		uuid := r.URL.Query().Get("u")
+		if uuid == "" {
+			uuid = parseAgent(r.UserAgent(), r.Header.Get("X-Signage-Agent")).UUID
+		}
+		d, err = h.store.DeviceByUUID(r.Context(), uuid)
 	}
 	if errors.Is(err, store.ErrNotFound) {
 		http.NotFound(w, r)
@@ -323,6 +333,10 @@ func (h *Handler) mediaFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) fail(w http.ResponseWriter, err error) {
+	// The device hung up mid-request; nothing went wrong on our side.
+	if errors.Is(err, context.Canceled) {
+		return
+	}
 	h.log.Error("Грешка при заявка от устройство", "грешка", err)
 	http.Error(w, "internal error", http.StatusInternalServerError)
 }
@@ -353,7 +367,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-func statusSMIL(refresh int) []byte {
+func statusSMIL(refresh int, page string) []byte {
 	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <smil>
   <head>
@@ -361,11 +375,11 @@ func statusSMIL(refresh int) []byte {
   </head>
   <body>
     <seq repeatCount="indefinite">
-      <ref src="pair.html" type="text/html" dur="60s"/>
+      <ref src="%s" type="text/html" dur="60s"/>
     </seq>
   </body>
 </smil>
-`, refresh))
+`, refresh, page))
 }
 
 var pairTmpl = template.Must(template.New("pair").Parse(`<!doctype html>

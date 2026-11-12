@@ -144,7 +144,7 @@ export function DeviceTable({ devices, idx, showSite, serverTime, onSelect }: {
 }
 
 function AddChild({ parent, onChange, onSelect }: { parent: TreeNode; onChange: () => Promise<void>; onSelect: (s: Selection) => void }) {
-  const [kind, setKind] = useState<Kind>("site");
+  const [kind, setKind] = useState<Kind>("group");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 

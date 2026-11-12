@@ -317,6 +317,10 @@ func (s *Server) storeErr(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) fail(w http.ResponseWriter, err error) {
+	// The browser left the page or reloaded mid-request; not an error.
+	if errors.Is(err, context.Canceled) {
+		return
+	}
 	s.log.Error("Грешка в админ заявка", "грешка", err)
 	writeErr(w, http.StatusInternalServerError, "internal error")
 }

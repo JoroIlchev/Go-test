@@ -145,3 +145,21 @@ func selfSigned(t *testing.T, dir string) (certFile, keyFile string) {
 	os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kb}), 0o600)
 	return certFile, keyFile
 }
+
+func TestSystemdUnit(t *testing.T) {
+	u := systemdUnit("/opt/marquee/marquee", "/opt/marquee", "georgi",
+		[]string{"-domain", "ads.example.bg", "-acme-email", "a%b@x.bg", "-public-url", "https://$host"})
+	for _, want := range []string{
+		`ExecStart="/opt/marquee/marquee" "-domain" "ads.example.bg" "-acme-email" "a%%b@x.bg" "-public-url" "https://$$host"`,
+		"User=georgi\nAmbientCapabilities=CAP_NET_BIND_SERVICE",
+		"Restart=always",
+		"WantedBy=multi-user.target",
+	} {
+		if !strings.Contains(u, want) {
+			t.Errorf("missing %q in:\n%s", want, u)
+		}
+	}
+	if strings.Contains(systemdUnit("/m", "/", "", nil), "User=") {
+		t.Error("root unit names a user")
+	}
+}

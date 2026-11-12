@@ -291,3 +291,36 @@ func TestDefaultPollFromSettings(t *testing.T) {
 		t.Fatalf("back to -refresh: %s %+v", got, set)
 	}
 }
+
+// Some players open pair.html in a WebView with the browser's own User-Agent, so
+// the shared index must name the device in the page link for the code to show.
+func TestPairPageWithoutPlayerAgent(t *testing.T) {
+	e := newEnv(t)
+	ph := httptest.NewServer(player.New(e.st, mustStorage(e), slog.New(slog.NewTextHandler(io.Discard, nil)), player.Config{RefreshSec: 900}))
+	defer ph.Close()
+	get := func(path, agent string) string {
+		req, _ := http.NewRequest("GET", ph.URL+path, nil)
+		req.Header.Set("User-Agent", agent)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d %s", path, resp.StatusCode, b)
+		}
+		return string(b)
+	}
+	smil := get("/p/index.smil", "GAPI/1.0 (UUID:uuid-web; NAME:x) player/1.0 (MODEL:box)")
+	if !strings.Contains(smil, `src="pair.html?u=uuid-web"`) {
+		t.Fatalf("pair page link without the device:\n%s", smil)
+	}
+	dev, err := e.st.DeviceByUUID(context.Background(), "uuid-web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page := get("/p/pair.html?u=uuid-web", "Mozilla/5.0 (Linux; Android 7.1.1) WebView"); !strings.Contains(page, dev.PairingCode) {
+		t.Fatalf("no code %s on the page", dev.PairingCode)
+	}
+}

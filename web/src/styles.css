@@ -81,11 +81,7 @@ code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
 .main { grid-area: main; overflow: auto; padding: 24px; }
 .main > section { max-width: 980px; display: flex; flex-direction: column; gap: 16px; }
 
-@media (max-width: 760px) {
-  .shell { grid-template: "top" auto "side" auto "main" 1fr / 1fr; }
-  .sidebar { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--border); }
-  .main { padding: 16px; }
-}
+.menu-btn, .menu-back, .phone-only { display: none; }
 
 /* Buttons */
 button { cursor: pointer; border-radius: 8px; border: 1px solid transparent; padding: 7px 14px; background: none; }
@@ -329,3 +325,55 @@ details.small { margin-top: 10px; }
 .seq-cell.focus { border-color: var(--accent); }
 
 .client-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; margin: 6px 0; }
+
+/* Phone: the tree becomes a drawer, rows wrap, targets fit a finger. */
+@media (max-width: 760px) {
+  .shell { grid-template: "top" auto "main" 1fr / 1fr; }
+  .topbar { padding: 8px 12px; gap: 8px; position: sticky; top: 0; z-index: 5; }
+  .menu-btn { display: inline-block; font-size: 20px; padding: 4px 12px; }
+  .phone-only { display: block; }
+  .who-name { display: none; }
+  .badge { margin-left: 0; }
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 20; width: min(320px, 86vw);
+    transform: translateX(-100%); transition: transform .2s ease; box-shadow: 0 0 24px rgba(0,0,0,.25);
+    padding-top: env(safe-area-inset-top);
+  }
+  .menu-open .sidebar { transform: none; }
+  .menu-open .menu-back { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(0,0,0,.45); }
+  .main { padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .main > section { gap: 12px; }
+  .card { padding: 12px; }
+  .empty { padding: 32px 8px; }
+
+  /* Finger-sized controls; 16px inputs stop phones zooming in on focus. */
+  button { min-height: 40px; }
+  .nav-item, .label, .twisty { min-height: 40px; }
+  .icon { min-width: 40px; }
+  .link, .swatch, .thumb, .pick { min-height: 0; }
+  input, select, textarea { font-size: 16px; }
+  .search { width: 100%; }
+
+  /* Wide tables scroll sideways instead of squeezing. */
+  .table { display: block; overflow-x: auto; white-space: nowrap; }
+  .facts { grid-template-columns: 1fr; gap: 0 0; }
+  .facts dt { margin-top: 8px; }
+  .tabs { overflow-x: auto; }
+  .tabs button { flex: none; }
+  .title-input { font-size: 18px; }
+
+  .media-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .uploads li { grid-template-columns: minmax(0, 1fr) auto; }
+  .uploads li .bar { grid-column: 1 / -1; }
+
+  /* Playlist rows wrap; dragging needs a mouse, the arrows work by touch. */
+  .playlist li { flex-wrap: wrap; row-gap: 6px; }
+  .playlist .grip { display: none; }
+  .pl-name { flex-basis: calc(100% - 110px); }
+  .pl-actions { margin-left: auto; }
+
+  .modal-back { padding: 0; }
+  .modal, .modal.wide { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+  .preview-body img, .preview-body video { max-height: 55vh; }
+}
+

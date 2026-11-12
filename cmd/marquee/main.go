@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	_ "time/tzdata" // Windows has no IANA zone database
 
 	"golang.org/x/term"
@@ -42,7 +43,7 @@ func main() {
 				defer logs.Close()
 				// The console and the day's file get the same lines.
 				log = slog.New(logx.New(logx.Fanout{os.Stdout, logs}, slog.LevelInfo))
-				ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+				ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM) // SIGTERM: systemctl stop
 				defer stop()
 				err = run(ctx, cfg, log, logs)
 			}
