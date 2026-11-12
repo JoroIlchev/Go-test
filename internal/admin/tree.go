@@ -37,6 +37,8 @@ type deviceDTO struct {
 	// considered offline (missed that check by more than the grace period).
 	NextCheckAt  *string `json:"next_check_at"`
 	OfflineSince *string `json:"offline_since"`
+	// What Marquee Player reported; absent for other players.
+	Info *store.DeviceInfo `json:"info,omitempty"`
 }
 
 func toNodeDTO(n *store.Node) nodeDTO {
@@ -52,6 +54,7 @@ func toDeviceDTO(d *store.Device, u *store.User, publicURL string) deviceDTO {
 	out := deviceDTO{
 		ID: d.ID, Name: d.Name, Status: d.Status, AuthMode: d.AuthMode, AuthUser: d.AuthUser,
 		HasPassword: d.AuthPassHash != "", UserAgent: d.UserAgent, LastIP: d.LastIP, CreatedAt: d.CreatedAt,
+		Info: d.ParsedInfo(),
 	}
 	if d.NodeID.Valid {
 		out.NodeID = &d.NodeID.Int64

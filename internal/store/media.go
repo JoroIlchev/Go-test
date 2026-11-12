@@ -153,11 +153,13 @@ func (s *Store) MarkMediaReady(ctx context.Context, id int64, p MediaProbe) erro
 		 WHERE id = ?`,
 		p.SHA256, p.Ext, p.Size, p.Width, p.Height, p.DurationMS, p.VideoCodec, p.AudioCodec, p.FPS, p.Bitrate,
 		p.Warnings, p.HasThumb, id)
+	s.notify()
 	return err
 }
 
 func (s *Store) MarkMediaFailed(ctx context.Context, id int64, msg string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE media SET status = 'failed', error = ? WHERE id = ?`, msg, id)
+	s.notify()
 	return err
 }
 

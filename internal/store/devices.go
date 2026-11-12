@@ -27,18 +27,19 @@ type Device struct {
 	CreatedAt    string         `json:"created_at"`
 	NextCheckAt  sql.NullString `json:"-"` // when the device was told to come back
 	OfflineSince sql.NullString `json:"-"` // set when it missed that and an alert went out
+	Info         string         `json:"-"` // DeviceInfo JSON from the marquee player
 }
 
 var ErrNotFound = errors.New("not found")
 
 const deviceCols = `id, node_id, uuid, name, token, pairing_code, status, auth_mode,
-	auth_user, auth_pass_hash, user_agent, last_ip, last_seen_at, created_at, next_check_at, offline_since`
+	auth_user, auth_pass_hash, user_agent, last_ip, last_seen_at, created_at, next_check_at, offline_since, info`
 
 func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 	var d Device
 	err := row.Scan(&d.ID, &d.NodeID, &d.UUID, &d.Name, &d.Token, &d.PairingCode, &d.Status,
 		&d.AuthMode, &d.AuthUser, &d.AuthPassHash, &d.UserAgent, &d.LastIP, &d.LastSeenAt, &d.CreatedAt,
-		&d.NextCheckAt, &d.OfflineSince)
+		&d.NextCheckAt, &d.OfflineSince, &d.Info)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

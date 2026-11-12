@@ -77,8 +77,9 @@ export function PendingPanel({ idx, pending, hubUrl, serverTime, onChange, onSel
           </table>
         )}
         <p className="muted small">
-          Нови устройства се появяват тук, когато плейърът се свърже към общия адрес{" "}
-          <code>{(hubUrl ?? "") + "/p/index.smil"}</code>.
+          Нови устройства се появяват тук, когато Marquee Player се свърже с хъба (инсталира се от{" "}
+          <a href={(hubUrl ?? "") + "/app"} target="_blank" rel="noreferrer"><code>{(hubUrl ?? "") + "/app"}</code></a>{" "}
+          в браузъра на устройството) или друг плейър — с общия адрес <code>{(hubUrl ?? "") + "/p/index.smil"}</code>.
           Сравнете кода в таблицата с кода на екрана, преди да свържете.
         </p>
       </div>

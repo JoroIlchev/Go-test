@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { api, errorText, type Device, type User } from "./api";
-import { ago, deviceState, type TreeIndex, isStaff } from "./model";
+import { api, errorText, type Device, type DeviceInfo, type User } from "./api";
+import { ago, deviceState, formatBytes, type TreeIndex, isStaff } from "./model";
 import type { Selection } from "./App";
 import { Breadcrumb } from "./NodePanel";
 
@@ -42,10 +42,32 @@ export function DevicePanel({ me, idx, device: d, serverTime, onChange, onSelect
         </dl>
       </div>
 
+      {d.info && <Hardware info={d.info} />}
+
       {isStaff(me) ? <DeviceSettings d={d} idx={idx} onChange={onChange} /> : (
         <p className="muted">Настройките на устройството се управляват от оператора на системата.</p>
       )}
     </section>
+  );
+}
+
+function Hardware({ info: i }: { info: DeviceInfo }) {
+  const days = Math.floor(i.uptime_s / 86400);
+  const hours = Math.floor((i.uptime_s % 86400) / 3600);
+  return (
+    <div className="card">
+      <h3>Устройство</h3>
+      <dl className="facts">
+        <dt>Модел</dt><dd>{[i.manufacturer, i.model].filter(Boolean).join(" ") || "—"}</dd>
+        <dt>Android</dt><dd>{i.android || "—"}</dd>
+        <dt>Екран</dt><dd>{i.screen_w && i.screen_h ? `${i.screen_w}×${i.screen_h}, ${i.screen_w >= i.screen_h ? "хоризонтален" : "вертикален"}` : "—"}</dd>
+        <dt>Видео до</dt><dd>{i.video_max_w ? `${i.video_max_w}×${i.video_max_h}${i.hevc ? ", и H.265" : ", само H.264"}` : "—"}</dd>
+        <dt>Свободно място</dt><dd>{i.total_bytes ? `${formatBytes(i.free_bytes)} от ${formatBytes(i.total_bytes)}` : "—"}</dd>
+        <dt>Локален IP</dt><dd>{i.local_ip || "—"}</dd>
+        <dt>Работи от</dt><dd>{i.uptime_s ? (days ? `${days} дни ${hours} ч` : `${hours} ч`) : "—"}</dd>
+        <dt>Плейър</dt><dd>Marquee Player {i.app}</dd>
+      </dl>
+    </div>
   );
 }
 
@@ -93,7 +115,7 @@ function DeviceSettings({ d, idx, onChange }: { d: Device; idx: TreeIndex; onCha
             </select>
           </label>
         </div>
-        <fieldset>
+        {!d.info && <fieldset>
           <legend>Достъп на плейъра</legend>
           <label className="radio"><input type="radio" checked={authMode === "link"} onChange={() => setAuthMode("link")} />
             Само таен линк</label>
@@ -108,13 +130,14 @@ function DeviceSettings({ d, idx, onChange }: { d: Device; idx: TreeIndex; onCha
             </div>
           )}
           <p className="muted small">Режимът с парола важи за личния линк. Не всички плейъри го поддържат.</p>
-        </fieldset>
+        </fieldset>}
         {error && <div className="error">{error}</div>}
         {msg && <div className="ok">{msg}</div>}
         <div className="buttons"><button className="primary">Запази</button></div>
       </form>
 
       <div className="card">
+        {d.info ? <h3>Достъп</h3> : <>
         <h3>Личен линк</h3>
         <div className="copy-row">
           <code className="mono">{d.url}</code>
@@ -124,9 +147,10 @@ function DeviceSettings({ d, idx, onChange }: { d: Device; idx: TreeIndex; onCha
           Плейърите могат да ползват и общия адрес <code>{(d.url ?? "").replace(/\/d\/[^/]+\/index\.smil$/, "/p/index.smil")}</code>:
           тогава се разпознават по UUID. Адресът на хъба се сменя от Настройки.
         </p>
+        </>}
         <div className="buttons">
-          <button className="ghost" onClick={() => confirm("Старият линк спира да работи веднага. Продължаваме?") &&
-            patch({ rotate_token: true }, "Нов линк е генериран.")}>Генерирай нов линк</button>
+          {!d.info && <button className="ghost" onClick={() => confirm("Старият линк спира да работи веднага. Продължаваме?") &&
+            patch({ rotate_token: true }, "Нов линк е генериран.")}>Генерирай нов линк</button>}
           {d.status === "blocked" ? (
             <button className="ghost" onClick={() => patch({ status: "active" }, "Устройството е активирано.")}>Активирай</button>
           ) : (

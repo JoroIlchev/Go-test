@@ -6,3 +6,5 @@ web/node_modules/
 tools/
 marquee*.exe~
 marquee-linux*
+# Built from android/; ships next to marquee.exe, offered at /app.
+marquee-player.apk

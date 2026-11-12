@@ -18,7 +18,8 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	changes changes
 }
 
 // Open opens (or creates) marquee.db in dataDir and applies pending migrations.

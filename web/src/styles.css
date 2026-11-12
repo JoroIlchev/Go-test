@@ -377,3 +377,5 @@ details.small { margin-top: 10px; }
   .preview-body img, .preview-body video { max-height: 55vh; }
 }
 
+.fit-warnings { margin-top: 10px; background: color-mix(in srgb, var(--pending) 14%, var(--surface)); }
+.fit-warnings ul { margin: 4px 0 0; padding-left: 18px; }

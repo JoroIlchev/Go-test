@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fitWarnings } from "./deviceFit";
 import {
   api, errorText, type CampaignDetail, type CampaignSpec, type CampaignVersion, type Media, type TreeNode, type User,
 } from "./api";
@@ -186,6 +187,7 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
           </div>
           <Playlist spec={spec} byId={byId} editable={editable} onChange={(items) => set({ items })} />
           <SequenceStrip spec={spec} seq={seq} byId={byId} />
+          <FitWarnings warnings={fitWarnings(spec, idx, byId)} />
           <div className="grid2" style={{ marginTop: 12 }}>
             <label>Ред на излъчване
               <select value={spec.order ?? ""} disabled={!editable} onChange={(e) => set({ order: e.target.value as CampaignSpec["order"] })}>
@@ -337,6 +339,16 @@ function Playlist({ spec, byId, editable, onChange }: {
         );
       })}
     </ol>
+  );
+}
+
+function FitWarnings({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="notice small fit-warnings">
+      <strong>⚠ На някои устройства няма да изглежда добре</strong>
+      <ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+    </div>
   );
 }
 

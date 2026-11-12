@@ -375,4 +375,5 @@ func (s *Store) Audit(ctx context.Context, userID int64, action string, nodeID i
 	s.db.ExecContext(ctx,
 		`INSERT INTO audit_log (user_id, action, node_id, details) VALUES (?, ?, ?, ?)`,
 		userID, action, node, details)
+	s.notify()
 }

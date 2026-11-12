@@ -42,6 +42,8 @@ type Config struct {
 	// DefaultPoll, when set, gives the hub-wide schedule (from the settings)
 	// in place of RefreshSec.
 	DefaultPoll func(context.Context) poll.Policy
+	// AppFile is the Marquee Player APK offered at /app (see app.go).
+	AppFile string
 }
 
 func New(st *store.Store, storage *media.Storage, log *slog.Logger, cfg Config) *Handler {
@@ -62,6 +64,10 @@ func New(st *store.Store, storage *media.Storage, log *slog.Logger, cfg Config) 
 	// Per-device secret URL, for players configured with their own link.
 	h.mux.HandleFunc("GET /d/{token}/index.smil", h.deviceIndex)
 	h.mux.HandleFunc("GET /d/{token}/pair.html", h.pairPage)
+	// Marquee Player (Android app): see api.go.
+	h.mux.HandleFunc("POST /api/v1/sync", h.sync)
+	h.mux.HandleFunc("GET /app", h.appPage)
+	h.mux.HandleFunc("GET /app/"+AppName, h.appFile)
 	return h
 }
 
@@ -219,6 +225,26 @@ func (h *Handler) pairPage(w http.ResponseWriter, r *http.Request) {
 // site or one of its ancestors.
 // labels name the included versions ("Обедно меню v2") for the log.
 func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, seed uint64, now time.Time, refresh int, base string) (body []byte, included []int64, labels []string, err error) {
+	playables, media, labelOf, err := h.live(ctx, site)
+	if err != nil || len(playables) == 0 {
+		return nil, nil, nil, err
+	}
+	b := campaign.Builder{
+		Loc:        h.cfg.Loc,
+		RefreshSec: refresh,
+		Seed:       seed,
+		MediaURL:   func(m *store.Media) string { return base + "/m/" + m.FileName() },
+	}
+	body, included = b.Build(now, playables, media)
+	for _, id := range included {
+		labels = append(labels, labelOf[id])
+	}
+	return body, included, labels, nil
+}
+
+// live resolves the live campaign versions targeting the site or one of its
+// ancestors, the media they use and a label per version for the log.
+func (h *Handler) live(ctx context.Context, site *store.Node) ([]campaign.Playable, map[int64]*store.Media, map[int64]string, error) {
 	onPath := map[int64]bool{}
 	for _, id := range site.AncestorIDs() {
 		onPath[id] = true
@@ -231,6 +257,7 @@ func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, seed uint
 	for _, c := range campaigns {
 		names[c.ID] = c.Name
 	}
+	labelOf := map[int64]string{}
 	var playables []campaign.Playable
 	var mediaIDs []int64
 	for _, v := range versions {
@@ -256,6 +283,7 @@ func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, seed uint
 		}
 		playables = append(playables, campaign.Playable{VersionID: v.ID, Spec: spec, Rule: rule})
 		mediaIDs = append(mediaIDs, spec.MediaIDs()...)
+		labelOf[v.ID] = fmt.Sprintf("%s v%d", names[v.CampaignID], v.Number)
 	}
 	if len(playables) == 0 {
 		return nil, nil, nil, nil
@@ -264,21 +292,7 @@ func (h *Handler) campaignIndex(ctx context.Context, site *store.Node, seed uint
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	b := campaign.Builder{
-		Loc:        h.cfg.Loc,
-		RefreshSec: refresh,
-		Seed:       seed,
-		MediaURL:   func(m *store.Media) string { return base + "/m/" + m.FileName() },
-	}
-	body, included = b.Build(now, playables, media)
-	for _, id := range included {
-		for _, v := range versions {
-			if v.ID == id {
-				labels = append(labels, fmt.Sprintf("%s v%d", names[v.CampaignID], v.Number))
-			}
-		}
-	}
-	return body, included, labels, nil
+	return playables, media, labelOf, nil
 }
 
 // requestBase is the address the device used to reach us. Media URLs built

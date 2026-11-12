@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The marquee mark: concentric rings of light on the brand purple. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M16,0h32a16,16 0 0 1 16,16v32a16,16 0 0 1 -16,16h-32a16,16 0 0 1 -16,-16v-32a16,16 0 0 1 16,-16z" />
+    <path
+        android:pathData="M32,10a22,22 0 1 1 0,44a22,22 0 1 1 0,-44z"
+        android:strokeWidth="3"
+        android:strokeColor="#47FFFFFF" />
+    <path
+        android:pathData="M32,18a14,14 0 1 1 0,28a14,14 0 1 1 0,-28z"
+        android:strokeWidth="3.5"
+        android:strokeColor="#99FFFFFF" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,25a7,7 0 1 1 0,14a7,7 0 1 1 0,-14z" />
+</vector>

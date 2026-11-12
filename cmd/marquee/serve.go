@@ -136,6 +136,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 			p, _ := ops.DefaultPoll(ctx, st, poll.Interval(c.refresh))
 			return p
 		},
+		AppFile: appFile(),
 	})
 	scheme, port := c.playerEndpoint()
 	adminCfg := admin.Config{
@@ -275,4 +276,13 @@ func hsts(h http.Handler) http.Handler {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		h.ServeHTTP(w, r)
 	})
+}
+
+// appFile is the player APK next to the executable, offered at /app.
+func appFile() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(exe), player.AppName)
 }

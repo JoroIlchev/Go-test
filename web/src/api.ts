@@ -50,6 +50,26 @@ export interface Device {
   created_at: string;
   next_check_at: string | null;
   offline_since: string | null;
+  info?: DeviceInfo; // Marquee Player only
+}
+
+/** What Marquee Player reports about its device; 0 / "" = unknown. */
+export interface DeviceInfo {
+  manufacturer: string;
+  model: string;
+  android: string;
+  sdk: number;
+  app: string;
+  screen_w: number;
+  screen_h: number;
+  density: number;
+  video_max_w: number;
+  video_max_h: number;
+  hevc: boolean;
+  free_bytes: number;
+  total_bytes: number;
+  local_ip: string;
+  uptime_s: number;
 }
 
 export interface Tree {
