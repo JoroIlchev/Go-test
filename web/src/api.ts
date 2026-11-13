@@ -32,6 +32,8 @@ export interface TreeNode {
   client_id: number;
   kind: Kind;
   name: string;
+  /** The operator's own ads ("Моята реклама"), super admins only. */
+  house?: boolean;
 }
 
 export interface Device {
@@ -130,6 +132,8 @@ export interface CampaignSpec {
   time_to: string;
   priority: number;
   order?: "" | "shuffle";
+  /** Own ads only: plays this many times a day within the clients' content. */
+  per_day?: number;
 }
 
 export type CampaignState = "draft" | "pending" | "active" | "scheduled" | "expired" | "stopped";
@@ -284,6 +288,33 @@ export function uploadFile(nodeId: number, file: File, onProgress: (fraction: nu
   });
 }
 
+/** Creates a draft campaign in nodeId from a file made by "Изтегли кампанията". */
+export function importCampaign(nodeId: number, file: File, onProgress: (fraction: number) => void): Promise<{ id: number }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/campaigns/import?node_id=${nodeId}`);
+    xhr.setRequestHeader("X-Marquee", "1");
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      if (xhr.status !== 201) {
+        let msg = xhr.statusText;
+        try {
+          msg = JSON.parse(xhr.responseText).error ?? msg;
+        } catch {
+          /* not JSON */
+        }
+        reject(new ApiError(xhr.status, msg));
+        return;
+      }
+      resolve(JSON.parse(xhr.responseText));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "Връзката прекъсна"));
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    xhr.send(fd);
+  });
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -355,6 +386,12 @@ const messages: Record<string, string> = {
   "e-mail is not configured": "Имейлът не е настроен",
   "month must be YYYY-MM": "Невалиден месец",
   "invalid hub address": "Невалиден адрес: въведете IP (напр. 85.10.20.30) или http://IP:порт",
+  "set how many times a day the ad plays": "Задайте колко пъти на ден да се излъчва рекламата",
+  "times per day are only for your own ads": "„Пъти на ден“ е само за собствената реклама",
+  "times per day must be between 1 and 200": "Пъти на ден: от 1 до 200",
+  "not a campaign file": "Това не е файл с кампания",
+  "damaged campaign file": "Файлът с кампанията е повреден",
+  "no file": "Изберете файл",
 };
 
 export interface Slideshow {

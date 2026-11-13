@@ -16,6 +16,9 @@ type Node struct {
 	Name      string        `json:"name"`
 	Path      string        `json:"-"`
 	CreatedAt string        `json:"created_at"`
+	// House marks the hub operator's own ads: a client node whose campaigns
+	// play on other clients' screens, seen only by super admins.
+	House bool `json:"house"`
 }
 
 var (
@@ -39,11 +42,11 @@ func (n *Node) AncestorIDs() []int64 {
 // IsUnder reports whether n is anc or one of its descendants.
 func (n *Node) IsUnder(anc *Node) bool { return strings.HasPrefix(n.Path, anc.Path) }
 
-const nodeCols = `id, parent_id, client_id, kind, name, path, created_at`
+const nodeCols = `id, parent_id, client_id, kind, name, path, created_at, house`
 
 func scanNode(row interface{ Scan(...any) error }) (*Node, error) {
 	var n Node
-	err := row.Scan(&n.ID, &n.ParentID, &n.ClientID, &n.Kind, &n.Name, &n.Path, &n.CreatedAt)
+	err := row.Scan(&n.ID, &n.ParentID, &n.ClientID, &n.Kind, &n.Name, &n.Path, &n.CreatedAt, &n.House)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -82,6 +85,22 @@ func (s *Store) queryNodes(ctx context.Context, q string, args ...any) ([]*Node,
 	return out, rows.Err()
 }
 
+// HouseNode returns the operator's ads node, creating it on first use.
+func (s *Store) HouseNode(ctx context.Context) (*Node, error) {
+	n, err := scanNode(s.db.QueryRowContext(ctx, `SELECT `+nodeCols+` FROM nodes WHERE house = 1 ORDER BY id LIMIT 1`))
+	if !errors.Is(err, ErrNotFound) {
+		return n, err
+	}
+	if n, err = s.CreateNode(ctx, nil, "client", "Моята реклама"); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE nodes SET house = 1 WHERE id = ?`, n.ID); err != nil {
+		return nil, err
+	}
+	n.House = true
+	return n, nil
+}
+
 // CreateNode adds a client (parent nil, kind "client") or a child node.
 func (s *Store) CreateNode(ctx context.Context, parent *Node, kind, name string) (*Node, error) {
 	name = strings.TrimSpace(name)
@@ -92,6 +111,9 @@ func (s *Store) CreateNode(ctx context.Context, parent *Node, kind, name string)
 	case parent == nil && kind != "client":
 		return nil, ErrBadParent
 	case parent != nil && kind != "group" && kind != "site":
+		return nil, ErrBadParent
+	case parent != nil && parent.House:
+		// The operator's ads hold campaigns and media only.
 		return nil, ErrBadParent
 	case parent != nil && parent.Kind == "site":
 		// Sites are leaves: devices hang off them, not further nodes.

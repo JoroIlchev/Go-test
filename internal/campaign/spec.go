@@ -23,6 +23,9 @@ type Spec struct {
 	TimeTo   string  `json:"time_to"`
 	Priority int     `json:"priority"`        // 0 normal, 1 high (e.g. a sale that replaces normal content)
 	Order    string  `json:"order,omitempty"` // "" in playlist order | shuffle (a new order every day)
+	// PerDay > 0 makes it a spot (the operator's own ad): the playlist
+	// plays once, that many times a day, within whatever else is on.
+	PerDay int `json:"per_day,omitempty"`
 }
 
 type Item struct {
@@ -32,6 +35,8 @@ type Item struct {
 }
 
 const maxEvery = 50
+
+const MaxPerDay = 200
 
 const localLayout = "2006-01-02T15:04"
 
@@ -101,6 +106,9 @@ func (s Spec) ValidateDraft(loc *time.Location) error {
 	}
 	if s.Order != "" && s.Order != "shuffle" {
 		return fmt.Errorf("invalid order %q", s.Order)
+	}
+	if s.PerDay < 0 || s.PerDay > MaxPerDay {
+		return fmt.Errorf("times per day must be between 1 and %d", MaxPerDay)
 	}
 	share, regular := 0.0, 0
 	for _, it := range s.Items {

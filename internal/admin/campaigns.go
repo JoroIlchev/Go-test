@@ -182,8 +182,12 @@ func (s *Server) createCampaign(w http.ResponseWriter, r *http.Request) {
 		forbidden(w)
 		return
 	}
-	// A new campaign plays on its own node by default.
+	// A new campaign plays on its own node by default; an own ad has no
+	// screens of its own and plays 10 times a day unless changed.
 	draft := campaign.Spec{Fit: "meet", Items: []campaign.Item{}, Targets: []int64{owner.ID}}
+	if owner.House {
+		draft.Targets, draft.PerDay = []int64{}, 10
+	}
 	c, err := s.store.CreateCampaign(r.Context(), owner, in.Name, draft.JSON(), u.ID)
 	if err != nil {
 		s.storeErr(w, err)
@@ -290,7 +294,8 @@ func (s *Server) targetDevices(r *http.Request, targets []int64) ([]int64, error
 }
 
 // checkSpec validates targets and media against the campaign's owner node:
-// targets must be at or below it, media must be visible from it.
+// targets must be at or below it (any client's nodes for the operator's own
+// ads), media must be visible from it.
 func (s *Server) checkSpec(r *http.Request, spec campaign.Spec, owner *store.Node, publish bool) string {
 	var err error
 	if publish {
@@ -301,10 +306,17 @@ func (s *Server) checkSpec(r *http.Request, spec campaign.Spec, owner *store.Nod
 	if err != nil {
 		return err.Error()
 	}
+	if owner.House {
+		if publish && spec.PerDay == 0 {
+			return "set how many times a day the ad plays"
+		}
+	} else if spec.PerDay != 0 {
+		return "times per day are only for your own ads"
+	}
 	nodeOf := s.nodeLookup(r)
 	for _, t := range spec.Targets {
 		n := nodeOf(t)
-		if n == nil || !n.IsUnder(owner) {
+		if n == nil || n.House || (!owner.House && !n.IsUnder(owner)) {
 			return "targets must be within the campaign's node"
 		}
 	}

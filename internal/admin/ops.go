@@ -282,7 +282,7 @@ func (s *Server) billing(w http.ResponseWriter, r *http.Request) {
 	rows := []usageRow{}
 	u := userFrom(r)
 	for _, c := range clients {
-		if !auth.ManagesClient(u, c.ID) {
+		if c.House || !auth.ManagesClient(u, c.ID) {
 			continue
 		}
 		row := usageRow{Usage: ops.Usage{ClientID: c.ID}, Name: c.Name}

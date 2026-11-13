@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, errorText, type CampaignState, type CampaignSummary, type TreeNode, type User } from "./api";
+import { api, errorText, importCampaign, type CampaignState, type CampaignSummary, type TreeNode, type User } from "./api";
 import { can, type TreeIndex } from "./model";
 import type { Selection } from "./App";
 
@@ -22,7 +22,21 @@ export function CampaignList({ me, idx, node, onSelect }: {
   const [items, setItems] = useState<CampaignSummary[]>([]);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState<number | null>(null);
   const canCreate = can(me, node, idx, "create");
+
+  async function importFile(file: File) {
+    setError("");
+    setImporting(0);
+    try {
+      const c = await importCampaign(node.id, file, setImporting);
+      onSelect({ type: "campaign", id: c.id });
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setImporting(null);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +64,11 @@ export function CampaignList({ me, idx, node, onSelect }: {
         <form className="inline-form" onSubmit={create} style={{ marginTop: 0, marginBottom: 12 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Име на нова кампания, напр. Черен петък" required />
           <button className="primary">+ Нова кампания в „{node.name}“</button>
+          <label className="ghost btn-link file-btn" title="Кампания, свалена с „Изтегли кампанията“, например от хъба на друг компютър">
+            {importing === null ? "Внеси от файл" : `Внасяне… ${Math.round(importing * 100)}%`}
+            <input type="file" accept=".zip" hidden disabled={importing !== null}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importFile(f); }} />
+          </label>
         </form>
       )}
       {error && <div className="error">{error}</div>}

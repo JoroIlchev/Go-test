@@ -45,6 +45,7 @@ type Segment struct {
 	Start, End time.Time
 	Items      []PlanItem
 	Audio      *store.Media // background music, looped
+	versions   []int64      // campaign versions it plays
 }
 
 type PlanItem struct {
@@ -58,48 +59,74 @@ type PlanItem struct {
 // format renders from it. It also returns the version ids included.
 func (b Builder) Plan(now time.Time, playables []Playable, media map[int64]*store.Media) ([]Segment, []int64) {
 	from, to := Window(now, b.Loc)
-	entries := make([]schedule.Entry[*Playable], len(playables))
+	var entries []schedule.Entry[*Playable]
+	var spots []*Playable
 	for i := range playables {
-		entries[i] = schedule.Entry[*Playable]{Rule: playables[i].Rule, Value: &playables[i]}
+		if playables[i].Spec.PerDay > 0 {
+			spots = append(spots, &playables[i])
+			continue
+		}
+		entries = append(entries, schedule.Entry[*Playable]{Rule: playables[i].Rule, Value: &playables[i]})
 	}
+	var all []Segment
+	for _, seg := range schedule.Timeline(entries, from, to, b.Loc) {
+		s := Segment{Start: seg.Start, End: seg.End}
+		for _, p := range seg.Values {
+			s.versions = append(s.versions, p.VersionID)
+			items, audio := b.playlist(p, from, media)
+			s.Items = append(s.Items, items...)
+			if s.Audio == nil {
+				s.Audio = audio
+			}
+		}
+		all = append(all, s)
+	}
+	all = b.insertSpots(all, spots, from, to, media)
+
 	included := map[int64]bool{}
 	var versions []int64
 	var out []Segment
-	for _, seg := range schedule.Timeline(entries, from, to, b.Loc) {
-		if !seg.End.IsZero() && !seg.End.After(now) {
+	for _, s := range all {
+		if !s.End.IsZero() && !s.End.After(now) {
 			continue // already over
 		}
-		s := Segment{Start: seg.Start, End: seg.End}
-		for _, p := range seg.Values {
-			if !included[p.VersionID] {
-				included[p.VersionID] = true
-				versions = append(versions, p.VersionID)
-			}
-			fit := p.Spec.Fit
-			if fit == "" {
-				fit = "meet"
-			}
-			for _, i := range p.Spec.Sequence(b.seed(from, p.VersionID)) {
-				it := p.Spec.Items[i]
-				m := media[it.MediaID]
-				if m == nil || m.Status != "ready" || (m.Kind != "image" && m.Kind != "video") {
-					continue
-				}
-				d := it.DurationS
-				if m.Kind == "image" && d <= 0 {
-					d = 10
-				}
-				s.Items = append(s.Items, PlanItem{Media: m, DurationS: d, Fit: fit})
-			}
-			if s.Audio == nil && p.Spec.AudioID != 0 {
-				if a := media[p.Spec.AudioID]; a != nil && a.Status == "ready" {
-					s.Audio = a
-				}
+		for _, v := range s.versions {
+			if !included[v] {
+				included[v] = true
+				versions = append(versions, v)
 			}
 		}
 		out = append(out, s)
 	}
 	return out, versions
+}
+
+// playlist is p's items in play order, with its music.
+func (b Builder) playlist(p *Playable, from time.Time, media map[int64]*store.Media) ([]PlanItem, *store.Media) {
+	fit := p.Spec.Fit
+	if fit == "" {
+		fit = "meet"
+	}
+	var items []PlanItem
+	for _, i := range p.Spec.Sequence(b.seed(from, p.VersionID)) {
+		it := p.Spec.Items[i]
+		m := media[it.MediaID]
+		if m == nil || m.Status != "ready" || (m.Kind != "image" && m.Kind != "video") {
+			continue
+		}
+		d := it.DurationS
+		if m.Kind == "image" && d <= 0 {
+			d = 10
+		}
+		items = append(items, PlanItem{Media: m, DurationS: d, Fit: fit})
+	}
+	var audio *store.Media
+	if p.Spec.AudioID != 0 {
+		if a := media[p.Spec.AudioID]; a != nil && a.Status == "ready" {
+			audio = a
+		}
+	}
+	return items, audio
 }
 
 // Build renders the SMIL index for a device. Segments become <par> blocks in
@@ -129,12 +156,18 @@ func (b Builder) Build(now time.Time, playables []Playable, media map[int64]*sto
 		}
 		fmt.Fprintf(&buf, "    <par begin=\"%s\"%s>\n", begin, end)
 		buf.WriteString("      <seq repeatCount=\"indefinite\">\n")
+		// Some players mute media without an explicit soundLevel. The music
+		// plays instead of the videos' own sound, as in Marquee Player.
+		videoLevel := "100%"
+		if seg.Audio != nil {
+			videoLevel = "0%"
+		}
 		for _, it := range seg.Items {
-			b.writeItem(&buf, it)
+			b.writeItem(&buf, it, videoLevel)
 		}
 		buf.WriteString("      </seq>\n")
 		if seg.Audio != nil {
-			fmt.Fprintf(&buf, "      <audio src=\"%s\" repeatCount=\"indefinite\"/>\n", attr(b.MediaURL(seg.Audio)))
+			fmt.Fprintf(&buf, "      <audio src=\"%s\" repeatCount=\"indefinite\" soundLevel=\"100%%\"/>\n", attr(b.MediaURL(seg.Audio)))
 		}
 		buf.WriteString("    </par>\n")
 	}
@@ -142,15 +175,15 @@ func (b Builder) Build(now time.Time, playables []Playable, media map[int64]*sto
 	return buf.Bytes(), versions
 }
 
-func (b Builder) writeItem(buf *bytes.Buffer, it PlanItem) {
+func (b Builder) writeItem(buf *bytes.Buffer, it PlanItem, soundLevel string) {
 	src := attr(b.MediaURL(it.Media))
 	switch {
 	case it.Media.Kind == "image":
 		fmt.Fprintf(buf, "        <img src=\"%s\" region=\"screen\" dur=\"%ss\" fit=\"%s\"/>\n", src, num(it.DurationS), it.Fit)
 	case it.DurationS > 0:
-		fmt.Fprintf(buf, "        <video src=\"%s\" region=\"screen\" dur=\"%ss\" fit=\"%s\"/>\n", src, num(it.DurationS), it.Fit)
+		fmt.Fprintf(buf, "        <video src=\"%s\" region=\"screen\" dur=\"%ss\" fit=\"%s\" soundLevel=\"%s\"/>\n", src, num(it.DurationS), it.Fit, soundLevel)
 	default:
-		fmt.Fprintf(buf, "        <video src=\"%s\" region=\"screen\" fit=\"%s\"/>\n", src, it.Fit)
+		fmt.Fprintf(buf, "        <video src=\"%s\" region=\"screen\" fit=\"%s\" soundLevel=\"%s\"/>\n", src, it.Fit, soundLevel)
 	}
 }
 

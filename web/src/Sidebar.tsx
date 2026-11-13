@@ -11,10 +11,13 @@ interface Props {
   sel: Selection;
   serverTime: string;
   onSelect: (s: Selection) => void;
+  onHouse: () => void;
 }
 
-export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime, onSelect }: Props) {
-  const roots = idx.children.get(null) ?? [];
+export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime, onSelect, onHouse }: Props) {
+  const all = idx.children.get(null) ?? [];
+  const roots = all.filter((n) => !n.house);
+  const house = all.find((n) => n.house);
   const staff = isStaff(me);
   const isAdminSomewhere = staff || me.roles.some((r) => r.role === "admin");
   const offline = idx.devices.filter((d) => deviceState(d, serverTime) === "offline").length;
@@ -38,6 +41,11 @@ export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime,
           <button className={"nav-item" + (sel?.type === "new-client" ? " active" : "")} onClick={() => onSelect({ type: "new-client" })}>
             + Нов клиент
           </button>
+          {me.is_super && (
+            <button className={"nav-item" + (house && sel?.type === "node" && sel.id === house.id ? " active" : "")} onClick={onHouse}>
+              ★ Моята реклама
+            </button>
+          )}
           {(me.is_super || me.can_billing) && (
             <button className={"nav-item" + (sel?.type === "billing" ? " active" : "")} onClick={() => onSelect({ type: "billing" })}>
               Таксуване

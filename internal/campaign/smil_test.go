@@ -42,16 +42,23 @@ func TestBuildBlackFridaySwitch(t *testing.T) {
 		// base plays now, until Black Friday starts at local midnight
 		`<par begin="0" end="wallclock(2026-11-11T00:00:00+02:00)">`,
 		`<img src="https://hub/m/aaa.jpg" region="screen" dur="8s" fit="meet"/>`,
-		`<audio src="https://hub/m/ccc.mp3" repeatCount="indefinite"/>`,
+		`<audio src="https://hub/m/ccc.mp3" repeatCount="indefinite" soundLevel="100%"/>`,
 		// Black Friday takes over on the player's own clock
 		`<par begin="wallclock(2026-11-11T00:00:00+02:00)" end="wallclock(2026-11-12T00:00:00+02:00)">`,
-		`<video src="https://hub/m/bbb.mp4" region="screen" fit="fill"/>`,
+		`<video src="https://hub/m/bbb.mp4" region="screen" fit="fill" soundLevel="100%"/>`,
 		// and base resumes afterwards, open ended
 		`<par begin="wallclock(2026-11-12T00:00:00+02:00)">`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("missing %s\n%s", want, s)
 		}
+	}
+	// With music the videos stay silent; without it they play their own sound.
+	music := mustRule(t, Spec{Items: []Item{{MediaID: 2}}, AudioID: 3})
+	music.VersionID = 30
+	if body, _ := b.Build(now, []Playable{music}, media); !strings.Contains(string(body),
+		`<video src="https://hub/m/bbb.mp4" region="screen" fit="meet" soundLevel="0%"/>`) {
+		t.Errorf("video under music not muted:\n%s", body)
 	}
 	if strings.Contains(s, "ddd.jpg") {
 		t.Error("media still processing must not be sent")

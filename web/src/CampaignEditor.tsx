@@ -134,6 +134,10 @@ export function CampaignEditor({ idx, id, onSelect }: Props) {
         <StateBadge state={c.state} />
         <span className="spacer" />
         <button className="ghost" onClick={() => setPreview(true)} disabled={spec.items.length === 0}>▶ Преглед</button>
+        {dirty
+          ? <button className="ghost" disabled title="Първо запазете черновата">Изтегли кампанията</button>
+          : <a className="ghost btn-link" href={`/api/campaigns/${id}/export`}
+              title="Файл с черновата и файловете ѝ, за да я внесете на друг хъб (Кампании → Внеси от файл)">Изтегли кампанията</a>}
         {editable && <button className="ghost" disabled={busy || !dirty} onClick={() => run(save, "Черновата е запазена.")}>Запази чернова</button>}
         {c.can_publish && (
           <button className="primary" disabled={busy || (!dirty && !c.draft_dirty)} onClick={publish}>
@@ -382,7 +386,11 @@ function SequenceStrip({ spec, seq, byId }: { spec: CampaignSpec; seq: number[];
 function Schedule({ spec, owner, idx, editable, onChange }: {
   spec: CampaignSpec; owner?: TreeNode; idx: TreeIndex; editable: boolean; onChange: (p: Partial<CampaignSpec>) => void;
 }) {
-  const nodes = owner ? subtree(idx, owner) : [];
+  // The operator's own ads may play on any client's screens.
+  const house = owner?.house ?? false;
+  const nodes = !owner ? [] : house
+    ? (idx.children.get(null) ?? []).filter((n) => !n.house).flatMap((n) => subtree(idx, n))
+    : subtree(idx, owner);
   const days = spec.days ?? [];
   const windowOn = spec.time_from !== "" || spec.time_to !== "";
   const toggleTarget = (id: number) =>
@@ -437,6 +445,20 @@ function Schedule({ spec, owner, idx, editable, onChange }: {
           )}
         </fieldset>
 
+        {house ? (
+        <fieldset>
+          <legend>Колко често</legend>
+          <label>Пъти на ден
+            <input type="number" min={1} max={200} value={spec.per_day ?? 10} disabled={!editable}
+              onChange={(e) => onChange({ per_day: Math.max(1, Math.min(200, Number(e.target.value) || 1)) })} />
+          </label>
+          <p className="muted small">
+            Рекламата се пуска веднъж (целият плейлист) толкова пъти на ден, равномерно в часовете, в които екранът
+            на клиента показва съдържание, и в рамките на периода и часовете отляво. После съдържанието на клиента
+            продължава от началото на плейлиста си.
+          </p>
+        </fieldset>
+        ) : (
         <fieldset>
           <legend>Приоритет</legend>
           <label className="radio"><input type="radio" disabled={!editable} checked={spec.priority === 0} onChange={() => onChange({ priority: 0 })} />
@@ -444,6 +466,7 @@ function Schedule({ spec, owner, idx, editable, onChange }: {
           <label className="radio"><input type="radio" disabled={!editable} checked={spec.priority === 1} onChange={() => onChange({ priority: 1 })} />
             Висок: докато е активна, заменя нормалните (промоции, Черен петък)</label>
         </fieldset>
+        )}
       </div>
     </div>
   );

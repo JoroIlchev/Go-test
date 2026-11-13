@@ -23,7 +23,26 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
   const children = idx.children.get(node.id) ?? [];
   const devices = idx.devicesUnder(node);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"overview" | "campaigns" | "media">("overview");
+  const [tab, setTab] = useState<"overview" | "campaigns" | "media">(node.house ? "campaigns" : "overview");
+
+  if (node.house) {
+    return (
+      <section>
+        <div className="title-row"><h2>★ Моята реклама</h2></div>
+        <p className="muted">
+          Вашите реклами, които се въртят на екраните на клиентите: всяка кампания тук се пуска определен брой пъти на ден,
+          разпределени равномерно в часовете, в които екранът показва съдържание. Клиентите не виждат този раздел
+          и не могат да променят рекламите.
+        </p>
+        <div className="tabs">
+          <button className={tab === "campaigns" ? "on" : ""} onClick={() => setTab("campaigns")}>Кампании</button>
+          <button className={tab === "media" ? "on" : ""} onClick={() => setTab("media")}>Медия</button>
+        </div>
+        {tab === "campaigns" && <CampaignList me={me} idx={idx} node={node} onSelect={onSelect} />}
+        {tab === "media" && <MediaLibrary me={me} idx={idx} node={node} />}
+      </section>
+    );
+  }
 
   async function rename() {
     const name = prompt("Ново име", node.name);

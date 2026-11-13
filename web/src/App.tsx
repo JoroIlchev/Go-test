@@ -73,6 +73,13 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
 
   const idx = useMemo(() => (tree ? new TreeIndex(tree.nodes, tree.devices) : null), [tree]);
 
+  // The operator's own ads live in a node made on first use.
+  async function openHouse() {
+    const h = await api<{ id: number }>("POST", "/api/house");
+    await reload();
+    setSel({ type: "node", id: h.id });
+  }
+
   async function logout() {
     await api("POST", "/api/logout").catch(() => {});
     onLogout();
@@ -106,7 +113,7 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
     } else if (sel.type === "logs" && (me.is_super || me.can_logs)) {
       main = <LogsPanel />;
     } else if (sel.type === "team" && me.is_super) {
-      main = <TeamPanel me={me} clients={idx.children.get(null) ?? []} onMeChange={reload} />;
+      main = <TeamPanel me={me} clients={(idx.children.get(null) ?? []).filter((n) => !n.house)} onMeChange={reload} />;
     }
   }
 
@@ -122,7 +129,7 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
       <div className="menu-back" onClick={() => setMenu(false)} />
       <aside className="sidebar">
         {idx && <Sidebar me={me} idx={idx} pendingCount={pending.length} approvalCount={approvals.length} sel={sel} onSelect={setSel}
-          serverTime={tree!.server_time} />}
+          serverTime={tree!.server_time} onHouse={openHouse} />}
       </aside>
       <main className="main">{main}</main>
     </div>

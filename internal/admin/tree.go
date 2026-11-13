@@ -17,6 +17,7 @@ type nodeDTO struct {
 	ClientID int64  `json:"client_id"`
 	Kind     string `json:"kind"`
 	Name     string `json:"name"`
+	House    bool   `json:"house,omitempty"`
 }
 
 type deviceDTO struct {
@@ -42,7 +43,7 @@ type deviceDTO struct {
 }
 
 func toNodeDTO(n *store.Node) nodeDTO {
-	d := nodeDTO{ID: n.ID, ClientID: n.ClientID, Kind: n.Kind, Name: n.Name}
+	d := nodeDTO{ID: n.ID, ClientID: n.ClientID, Kind: n.Kind, Name: n.Name, House: n.House}
 	if n.ParentID.Valid {
 		d.ParentID = &n.ParentID.Int64
 	}
@@ -84,7 +85,7 @@ func (s *Server) visibleRoots(r *http.Request, u *store.User) ([]*store.Node, er
 		if err != nil {
 			return nil, err
 		}
-		return slices.DeleteFunc(clients, func(c *store.Node) bool { return !auth.ManagesClient(u, c.ID) }), nil
+		return slices.DeleteFunc(clients, func(c *store.Node) bool { return !auth.Can(u, c, auth.PermView) }), nil
 	}
 	var nodes []*store.Node
 	for _, role := range u.Roles {

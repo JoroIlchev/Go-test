@@ -133,6 +133,9 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 	s.mux.Handle("DELETE /api/campaigns/{id}", s.authed(s.deleteCampaign))
 	s.mux.Handle("POST /api/campaigns/sequence", s.authed(s.campaignSequence))
 	s.mux.Handle("GET /api/approvals", s.authed(s.approvals))
+	s.mux.Handle("POST /api/house", s.superOnly(s.houseNode))
+	s.mux.Handle("GET /api/campaigns/{id}/export", s.authed(s.exportCampaign))
+	s.mux.Handle("POST /api/campaigns/import", s.authed(s.importCampaign))
 
 	s.mux.Handle("GET /api/nodes/{id}/poll", s.authed(s.nodePoll))
 	s.mux.Handle("PUT /api/nodes/{id}/poll", s.authed(s.setNodePoll))

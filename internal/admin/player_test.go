@@ -167,6 +167,20 @@ func TestAppDownload(t *testing.T) {
 	if _, page := get("/app"); !strings.Contains(page, `href="/app/marquee-player.apk"`) || !strings.Contains(page, ph.URL) {
 		t.Fatalf("page without the download or the hub address:\n%s", page)
 	}
+	req, _ := http.NewRequest("GET", ph.URL+"/app", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 7.1.1; wv) AppleWebKit/537.36 Chrome/52.0 Mobile Safari/537.36")
+	wv, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(wv.Body)
+	wv.Body.Close()
+	if !strings.Contains(string(b), "WebView") {
+		t.Fatal("no warning for a WebView")
+	}
+	if _, page := get("/app"); strings.Contains(page, "(WebView)") {
+		t.Fatal("WebView warning in a normal browser")
+	}
 	resp, body := get("/app/" + player.AppName)
 	if resp.Header.Get("Content-Type") != "application/vnd.android.package-archive" || body != "PK fake apk" {
 		t.Fatalf("download: %s %q", resp.Header.Get("Content-Type"), body)

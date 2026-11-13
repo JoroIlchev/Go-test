@@ -98,7 +98,8 @@ func (s *Store) LiveCampaigns(ctx context.Context, clientID int64) ([]*Campaign,
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT c.id, v.`+strings.ReplaceAll(versionCols, ", ", ", v.")+`
 		 FROM campaigns c JOIN campaign_versions v ON v.id = c.live_version_id
-		 WHERE c.client_id = ? AND v.status = 'approved' ORDER BY c.id`, clientID)
+		 WHERE (c.client_id = ? OR c.node_id IN (SELECT id FROM nodes WHERE house = 1))
+		   AND v.status = 'approved' ORDER BY c.id`, clientID)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -52,6 +52,7 @@ class Stage(
     private var segment: Segment? = null
     private var index = -1
     private var current: Item? = null
+    private var musicFile: File? = null // what [music] plays now, null when silent
     private var playing = false
     private var generation = 0 // bumps on every item, so stale timers do nothing
 
@@ -85,8 +86,10 @@ class Stage(
         check()
     }
 
-    /** A file arrived: start playing if we were waiting for one. */
+    /** A file arrived: start playing if we were waiting for one. The music
+     *  comes after the pictures and videos, so it usually arrives here too. */
     fun fileReady() {
+        startMusic(segment)
         if (!playing) next()
     }
 
@@ -112,9 +115,13 @@ class Stage(
         next()
     }
 
+    /** Plays the segment's music once its file is here; the same music goes
+     *  on without a restart when the next segment has it too. */
     private fun startMusic(seg: Segment?) {
-        val f = seg?.audio?.let(fileOf)
-        if (f == null || !f.exists()) {
+        val f = seg?.audio?.let(fileOf)?.takeIf { it.exists() }
+        if (f == musicFile) return
+        musicFile = f
+        if (f == null) {
             music.stop()
             video.volume = 1f
             return

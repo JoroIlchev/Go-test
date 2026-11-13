@@ -209,6 +209,7 @@ details.prep[open] summary { margin-bottom: 4px; }
 .card-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
 .small-btn { padding: 4px 10px; font-size: 12px; }
 .btn-link { text-decoration: none; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); color: inherit; }
+.file-btn { cursor: pointer; display: inline-block; }
 
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; z-index: 10; }
 .modal { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; width: min(960px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
