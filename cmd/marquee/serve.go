@@ -248,7 +248,7 @@ func tlsSetup(c *config) (*tls.Config, func(http.Handler) http.Handler, error) {
 // handler, everything else to rest (the admin UI, or a redirect), or 404.
 func public(playerH, rest http.Handler) http.Handler {
 	mux := http.NewServeMux()
-	for _, p := range []string{"/m/", "/p/", "/d/"} {
+	for _, p := range []string{"/m/", "/p/", "/d/", "/api/v1/", "/app", "/app/"} {
 		mux.Handle(p, playerH)
 	}
 	if rest != nil {
