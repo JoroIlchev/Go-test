@@ -43,6 +43,15 @@ type manifest struct {
 	Timezone    string         `json:"timezone"`
 	Segments    []manifestSeg  `json:"segments"`
 	Files       []manifestFile `json:"files"`
+	App         *manifestApp   `json:"app,omitempty"` // the player version on the hub
+}
+
+// manifestApp is the Marquee Player APK next to the hub; a player whose own
+// APK has another checksum installs it.
+type manifestApp struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
 }
 
 // manifestSeg plays its items in a loop from Start until End ("" = no end).
@@ -141,6 +150,9 @@ func (h *Handler) sync(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) manifest(ctx context.Context, r *http.Request, d *store.Device) (*manifest, error) {
 	m := &manifest{Status: d.Status, Name: d.Name, Timezone: h.cfg.Loc.String(),
 		Segments: []manifestSeg{}, Files: []manifestFile{}}
+	if sha, size := h.app.sum(h.cfg.AppFile); sha != "" {
+		m.App = &manifestApp{URL: requestBase(r, h.cfg.PublicURL) + "/app/" + AppName, SHA256: sha, Size: size}
+	}
 	if d.Status != "active" || !d.NodeID.Valid {
 		m.Status = "pending"
 		m.PairingCode = d.PairingCode

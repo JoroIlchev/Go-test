@@ -12,7 +12,7 @@
   <div class="sub">Сглобяване, инсталиране и стартиране</div>
   <p>Как се сглобява <code>marquee.exe</code> от кода, как се пуска първия път, всички команди и настройки от командния ред,
   работа като Windows услуга, мрежа, обновяване, резервни копия и възстановяване.</p>
-  <p class="meta">Версия на документа: 11.11.2026</p>
+  <p class="meta">Версия на документа: 17.11.2026</p>
 </section>
 
 <h2>Съдържание</h2>
@@ -56,6 +56,8 @@
   <tr><td>Node.js (с npm)</td><td>24 или по-нова</td><td><code>winget install --source winget OpenJS.NodeJS.LTS</code></td></tr>
   <tr><td>ffmpeg (essentials)</td><td>7 или по-нова</td><td><code>winget install --source winget Gyan.FFmpeg.Essentials</code></td></tr>
   <tr><td>Git</td><td>по желание</td><td><code>winget install --source winget Git.Git</code></td></tr>
+  <tr><td>JDK</td><td>17 или 21</td><td>Само за Marquee Player. Идва с Android Studio (папка <code>jbr</code>) или отделно (напр. Zulu).</td></tr>
+  <tr><td>Android SDK</td><td>API 36</td><td>Само за Marquee Player. Инсталира се с Android Studio.</td></tr>
 </table>
 <div class="note"><p>След инсталиране отворете <b>нов</b> прозорец на PowerShell, за да се зареди новият PATH.</p></div>
 <p>Сглобяването не изисква C компилатор: SQLite е чист Go (modernc.org/sqlite).</p>
@@ -74,6 +76,7 @@
 │   ├── poll\           график на проверките
 │   ├── schedule\       разписания (дни, часове, приоритети)
 │   └── store\          базата данни (SQLite) и миграциите
+├── android\            Marquee Player (Kotlin); ключът за подписване не е в git
 ├── web\                админ интерфейсът (React + TypeScript + Vite)
 │   ├── src\            код
 │   └── dist\           сглобеният интерфейс (вгражда се в exe-то)
@@ -83,7 +86,7 @@
 
 <h2>4. Сглобяване на marquee.exe</h2>
 <p>Интерфейсът се сглобява <b>първи</b>, защото Go вгражда готовата папка <code>web\dist</code> в exe-то.</p>
-<pre><code>cd C:\Users\&lt;потребител&gt;\projects\marquee
+<pre><code>cd D:\DEV\Go-test         # папката на проекта
 
 # 1. Интерфейс (първия път и при промяна на зависимостите: npm install)
 cd web
@@ -96,6 +99,19 @@ go build -o marquee.exe ./cmd/marquee</code></pre>
 <p>Ако <code>marquee.exe</code> в момента работи, Windows не позволява да се презапише. Тогава сглобете под друго име и го заменете
 при спрян marquee (раздел 14):</p>
 <pre><code>go build -o marquee-new.exe ./cmd/marquee</code></pre>
+
+<h3>Marquee Player (APK)</h3>
+<p>Release APK се подписва с ключа <code>android\marquee-release.jks</code>, описан в <code>android\keystore.properties</code>.
+Двата файла не са в git: копирайте ги ръчно на машината, на която сглобявате, и пазете резервно копие. С друг ключ
+устройствата не могат да се обновят и плейърът трябва да се деинсталира и свърже наново.</p>
+<p>Преди всяка нова версия увеличете <code>versionCode</code> (с 1) и <code>versionName</code> в
+<code>android\app\build.gradle.kts</code>. Android не инсталира по-нисък номер, а по версията в админа се вижда кой екран е обновен.</p>
+<pre><code>$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"   # или пътя до вашия JDK
+cd android
+.\gradlew.bat assembleRelease
+cd ..
+Copy-Item android\app\build\outputs\apk\release\app-release.apk marquee-player.apk -Force</code></pre>
+<p>Ако липсва <code>android\local.properties</code> (пътят до Android SDK), отворете веднъж папката <code>android</code> в Android Studio.</p>
 <h3>По-малък файл и версия за Linux</h3>
 <pre><code>go build -ldflags "-s -w" -o marquee.exe ./cmd/marquee      # без дебъг информация
 
@@ -128,6 +144,7 @@ npm run dev            # отваря http://localhost:5173, /api се преп�
 <h2>7. Какво се копира на сървъра</h2>
 <div class="tree">C:\marquee\
 ├── marquee.exe
+├── marquee-player.apk   плейърът за Android (сервира се на /app и обновява устройствата)
 └── tools\
     ├── ffmpeg.exe
     └── ffprobe.exe</div>
@@ -267,6 +284,31 @@ Start-Service marquee</code></pre>
 <p>След обновяване натиснете <b>Ctrl+F5</b> в браузъра, за да се зареди новият интерфейс. Промените по базата (миграции) се прилагат
 автоматично при старт. Препоръчително е преди обновяване да направите копие от Настройки → <span class="ui">Направи копие сега</span>.</p>
 
+<h3>Нова версия на Marquee Player</h3>
+<p>Сглобете APK-то (раздел 4) и сменете <code>marquee-player.apk</code> до exe-то. Рестарт на хъба не е нужен. Плейърите от
+версия 0.2.0 нататък забелязват новия файл до около минута, свалят го, проверяват контролната сума и го инсталират.
+По-старите версии нямат тази функция и се обновяват последен път на ръка: на устройството отворете <code>http://&lt;хъб&gt;/app</code>
+в браузъра и инсталирайте отгоре (данните и връзката с хъба остават).</p>
+<p>Без допълнителна настройка Android показва прозорец за потвърждение и някой трябва да натисне <span class="ui">Инсталирай</span>
+на екрана. На Android 8 и по-нов първия път пита и дали Marquee Player може да инсталира приложения.</p>
+
+<h3>Тихо обновяване (Device Owner)</h3>
+<p>Еднократна настройка на всяко устройство, след която обновяванията минават без никой да е до екрана:</p>
+<ol class="steps">
+  <li><b>Без Google акаунт.</b> Android позволява Device Owner само на устройство без акаунти. TV боксовете обикновено нямат;
+  ако има, махнете го от Настройки → Акаунти или нулирайте устройството и пропуснете влизането с акаунт.</li>
+  <li><b>Отстраняване на грешки (ADB).</b> Настройки → Информация → 7 пъти „Номер на компилацията“, после
+  Опции за програмисти → <b>USB debugging</b> (на някои боксове има и „ADB по мрежата“).</li>
+  <li><b>Плейърът е инсталиран</b> и свързан с хъба.</li>
+  <li><b>От компютър</b> с Android SDK (<code>platform-tools\adb.exe</code>), с USB кабел или по мрежата:
+<pre><code>adb connect 192.168.1.50:5555        # IP на устройството; с кабел не трябва
+adb shell dpm set-device-owner app.marquee.player/.Admin</code></pre>
+  Отговорът трябва да е <code>Success: Device owner set…</code>.</li>
+  <li>В админа, в карта <span class="ui">Устройство</span>, до минута пише „Обновяване: Автоматично, без потвърждение“.</li>
+</ol>
+<p>Докато плейърът е Device Owner, Android не дава да се деинсталира. Първо се отказва от това с:</p>
+<pre><code>adb shell am broadcast -a app.marquee.player.RELEASE_OWNER -n app.marquee.player/.ReleaseOwner</code></pre>
+
 <h2>15. Папката с данни</h2>
 <div class="tree">data\
 ├── marquee.db            базата: клиенти, потребители, устройства, кампании, настройки
@@ -316,6 +358,8 @@ Start-Service marquee</code></pre>
   <tr><td>Забравена парола на Супер Админ</td><td><code>.\marquee.exe reset-password -email ti@firma.bg</code> на сървъра (раздел 9).</td></tr>
   <tr><td>Услугата не тръгва</td><td>Вижте <code>data\logs</code> и Event Viewer → Windows Logs → System. Чести причини: относителен път във флаг, зает порт.</td></tr>
   <tr><td>Let's Encrypt не издава сертификат</td><td>Домейнът не сочи към машината или порт 80/443 не е пренасочен. Подробности в лога.</td></tr>
+  <tr><td>Устройствата не се обновяват</td><td>Новото APK е подписано с друг ключ или има по-нисък <code>versionCode</code>: плейърът го пропуска. Сглобете release с ключа на проекта и по-висок номер.</td></tr>
+  <tr><td><code>Not allowed to set the device owner because there are already some accounts</code></td><td>На устройството има акаунт. Махнете го или нулирайте устройството (раздел 14).</td></tr>
 </table>
 
 </body>

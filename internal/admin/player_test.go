@@ -2,6 +2,8 @@ package admin_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -184,5 +186,37 @@ func TestAppDownload(t *testing.T) {
 	resp, body := get("/app/" + player.AppName)
 	if resp.Header.Get("Content-Type") != "application/vnd.android.package-archive" || body != "PK fake apk" {
 		t.Fatalf("download: %s %q", resp.Header.Get("Content-Type"), body)
+	}
+
+	// Installed players learn the APK's checksum and update when it changes.
+	type appOffer struct {
+		Version string
+		App     *struct {
+			URL    string
+			SHA256 string
+			Size   int64
+		}
+	}
+	sync := func() appOffer {
+		req, _ := http.NewRequest("POST", ph.URL+"/api/v1/sync", strings.NewReader(`{"info":{},"version":""}`))
+		req.Header.Set("X-Device-Id", "3f6c1d0e-8a7b-4c2d-9e1f-0a1b2c3d4e5f")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out appOffer
+		json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	sum := func(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+	first := sync()
+	if first.App == nil || first.App.SHA256 != sum("PK fake apk") || first.App.Size != 11 || first.App.URL != ph.URL+"/app/"+player.AppName {
+		t.Fatalf("app offer: %+v", first.App)
+	}
+	os.WriteFile(apk, []byte("PK newer apk"), 0o644)
+	os.Chtimes(apk, time.Now(), time.Now().Add(time.Minute))
+	if next := sync(); next.App == nil || next.App.SHA256 != sum("PK newer apk") || next.Version == first.Version {
+		t.Fatalf("a new APK not offered: %+v (version %s -> %s)", next.App, first.Version, next.Version)
 	}
 }

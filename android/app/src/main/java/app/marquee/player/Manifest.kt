@@ -14,6 +14,8 @@ data class Manifest(
     val site: String,
     val segments: List<Segment>,
     val files: List<MediaFile>,
+    /** The player version on the hub. */
+    val app: MediaFile?,
 ) {
     /** The segment playing at [now] (hub time), if any. */
     fun segmentAt(now: Long): Segment? = segments.lastOrNull { it.start <= now && (it.end == null || now < it.end) }
@@ -45,6 +47,10 @@ data class Manifest(
                         size = it.optLong("size"),
                         kind = it.optString("kind"),
                     )
+                },
+                app = o.optJSONObject("app")?.let {
+                    MediaFile(name = "marquee-player.apk", url = it.optString("url"), sha256 = it.optString("sha256"),
+                        size = it.optLong("size"), kind = "app")
                 },
             )
         }

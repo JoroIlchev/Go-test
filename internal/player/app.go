@@ -2,19 +2,61 @@ package player
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Marquee Player is installed from the hub itself: the device's browser
 // opens /app, which explains the steps and serves the APK found next to the
 // hub (AppFile), so a new player version ships by replacing that file.
+// Installed players learn its checksum from the manifest and update
+// themselves when theirs differs.
 
 const AppName = "marquee-player.apk"
+
+// appRelease remembers the APK's checksum until the file changes.
+type appRelease struct {
+	mu   sync.Mutex
+	size int64
+	mod  time.Time
+	sha  string
+}
+
+// sum is the SHA-256 and size of the APK at path; "" when there is none.
+func (a *appRelease) sum(path string) (string, int64) {
+	if path == "" {
+		return "", 0
+	}
+	st, err := os.Stat(path)
+	if err != nil {
+		return "", 0
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.sha != "" && a.size == st.Size() && a.mod.Equal(st.ModTime()) {
+		return a.sha, a.size
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", 0
+	}
+	defer f.Close()
+	hs := sha256.New()
+	if _, err := io.Copy(hs, f); err != nil {
+		return "", 0
+	}
+	a.sha, a.size, a.mod = hex.EncodeToString(hs.Sum(nil)), st.Size(), st.ModTime()
+	return a.sha, a.size
+}
 
 func (h *Handler) appPage(w http.ResponseWriter, r *http.Request) {
 	data := struct {

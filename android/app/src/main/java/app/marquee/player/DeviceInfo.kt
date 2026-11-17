@@ -1,5 +1,6 @@
 package app.marquee.player
 
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.media.MediaCodecList
 import android.os.Build
@@ -39,6 +40,8 @@ class DeviceInfo(private val context: Context) {
             .put("total_bytes", fs.totalBytes)
             .put("local_ip", localIp())
             .put("uptime_s", SystemClock.elapsedRealtime() / 1000)
+            .put("owner", (context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager)
+                .isDeviceOwnerApp(context.packageName))
     }
 
     /** The largest common size a decoder plays at 30 fps, preferring hardware

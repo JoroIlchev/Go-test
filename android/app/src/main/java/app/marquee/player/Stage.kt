@@ -90,7 +90,21 @@ class Stage(
      *  comes after the pictures and videos, so it usually arrives here too. */
     fun fileReady() {
         startMusic(segment)
-        if (!playing) next()
+        if (!playing) {
+            next()
+            return
+        }
+        // A video looping alone lets the next item in once that item's file
+        // is here: it plays to its end (or its duration) and the loop goes on.
+        val cur = current ?: return
+        val items = segment?.items.orEmpty()
+        if (isPicture(cur) || items.count { fileOf(it.file).exists() } < 2) return
+        if (video.playbackState == Player.STATE_ENDED) {
+            next()
+        } else if (video.repeatMode == Player.REPEAT_MODE_ONE) {
+            video.repeatMode = Player.REPEAT_MODE_OFF
+            if (cur.durationMs > 0) schedule(cur)
+        }
     }
 
     fun release() {
@@ -144,6 +158,14 @@ class Stage(
         val it = items[index]
         // One video alone loops without a gap; one picture just stays.
         if (ready.size == 1 && playing && current == it) {
+            if (!isPicture(it)) {
+                // It may have been started as one of several and be about to end.
+                video.repeatMode = Player.REPEAT_MODE_ONE
+                if (video.playbackState == Player.STATE_ENDED) {
+                    video.seekTo(0)
+                    video.play()
+                }
+            }
             if (it.durationMs > 0 || isPicture(it)) schedule(it)
             return
         }

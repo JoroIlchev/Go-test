@@ -31,6 +31,7 @@ class Syncer(
     enum class Connection { OK, OFFLINE, BLOCKED }
 
     private val info = DeviceInfo(context)
+    private val updater = Updater(context, hub)
     private val manifestFile = File(context.filesDir, "manifest.json")
     val media = File(context.filesDir, "media").apply { mkdirs() }
 
@@ -64,6 +65,7 @@ class Syncer(
                         manifestFile.writeText(raw)
                         post { listener.onManifest(m) }
                         fetch(m)
+                        m.app?.let { app -> scope.launch { updater.offer(app) } }
                     }
                 } catch (e: BlockedException) {
                     post { listener.onConnection(Connection.BLOCKED) }

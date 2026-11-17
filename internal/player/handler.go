@@ -33,6 +33,7 @@ type Handler struct {
 	log     *slog.Logger
 	cfg     Config
 	mux     *http.ServeMux
+	app     appRelease
 }
 
 type Config struct {

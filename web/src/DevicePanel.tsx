@@ -66,6 +66,7 @@ function Hardware({ info: i }: { info: DeviceInfo }) {
         <dt>Локален IP</dt><dd>{i.local_ip || "—"}</dd>
         <dt>Работи от</dt><dd>{i.uptime_s ? (days ? `${days} дни ${hours} ч` : `${hours} ч`) : "—"}</dd>
         <dt>Плейър</dt><dd>Marquee Player {i.app}</dd>
+        <dt>Обновяване</dt><dd>{i.owner ? "Автоматично, без потвърждение" : "Автоматично, с потвърждение на екрана"}</dd>
       </dl>
     </div>
   );

@@ -25,6 +25,8 @@ type DeviceInfo struct {
 	TotalBytes int64  `json:"total_bytes"`
 	LocalIP    string `json:"local_ip"`
 	UptimeS    int64  `json:"uptime_s"`
+	// The player is the device owner: it updates itself without asking.
+	Owner bool `json:"owner,omitempty"`
 }
 
 // ParsedInfo decodes what Marquee Player reported; nil for other players and unknown data.

@@ -72,6 +72,8 @@ export interface DeviceInfo {
   total_bytes: number;
   local_ip: string;
   uptime_s: number;
+  /** The player is the device owner: it updates itself without asking. */
+  owner?: boolean;
 }
 
 export interface Tree {
