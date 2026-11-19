@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Logo } from "./Logo";
+import { LangSwitch } from "./LangSwitch";
+import { setLang, t, useLang } from "./i18n";
 import { api, ApiError, type Approval, type Device, type Tree, type User } from "./api";
 import { CampaignEditor } from "./CampaignEditor";
 import { ApprovalsPanel } from "./ApprovalsPanel";
@@ -30,12 +32,17 @@ export type Selection =
 
 export function App() {
   const [me, setMe] = useState<User | null | undefined>(undefined);
+  useLang(); // the whole admin re-renders in the new language
 
   useEffect(() => {
     api<User>("GET", "/api/me")
       .then(setMe)
       .catch(() => setMe(null));
   }, []);
+  // The language saved with the user wins over this browser's.
+  useEffect(() => {
+    if (me?.lang) setLang(me.lang);
+  }, [me?.lang]);
 
   if (me === undefined) return null;
   if (me === null) return <Login onLogin={setMe} />;
@@ -87,8 +94,8 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
 
   let main = (
     <div className="empty">
-      Изберете звено от дървото вляво.
-      <p className="phone-only"><button className="primary" onClick={() => setMenu(true)}>Отвори менюто</button></p>
+      {t("Изберете звено от дървото вляво.")}
+      <p className="phone-only"><button className="primary" onClick={() => setMenu(true)}>{t("Отвори менюто")}</button></p>
     </div>
   );
   if (idx && tree && sel) {
@@ -97,7 +104,7 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
         onChange={reload} onSelect={setSel} />;
     } else if (sel.type === "device") {
       const d = tree.devices.find((x) => x.id === sel.id);
-      if (d) main = <DevicePanel key={d.id} me={me} idx={idx} device={d} serverTime={tree.server_time} onChange={reload} onSelect={setSel} />;
+      if (d) main = <DevicePanel key={d.id} me={me} idx={idx} device={d} serverTime={tree.server_time} playerApp={tree.player_app} onChange={reload} onSelect={setSel} />;
     } else if (sel.type === "campaign") {
       main = <CampaignEditor key={sel.id} me={me} idx={idx} id={sel.id} onSelect={(s) => { setSel(s); reload(); }} />;
     } else if (sel.type === "approvals") {
@@ -120,11 +127,12 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
   return (
     <div className={"shell" + (menu ? " menu-open" : "")}>
       <header className="topbar">
-        <button className="ghost icon menu-btn" onClick={() => setMenu(!menu)} aria-label="Меню" aria-expanded={menu}>☰</button>
+        <button className="ghost icon menu-btn" onClick={() => setMenu(!menu)} aria-label={t("Меню")} aria-expanded={menu}>☰</button>
         <span className="brand"><Logo size={28} /></span>
         <span className="spacer" />
-        <span className="who"><span className="who-name">{me.name || me.email}</span>{me.is_super && <span className="badge">Супер Админ</span>}{me.is_manager && <span className="badge">Мениджър</span>}</span>
-        <button className="ghost" onClick={logout}>Изход</button>
+        <span className="who"><span className="who-name">{me.name || me.email}</span>{me.is_super && <span className="badge">{t("Супер Админ")}</span>}{me.is_manager && <span className="badge">{t("Мениджър")}</span>}</span>
+        <LangSwitch save />
+        <button className="ghost" onClick={logout}>{t("Изход")}</button>
       </header>
       <div className="menu-back" onClick={() => setMenu(false)} />
       <aside className="sidebar">

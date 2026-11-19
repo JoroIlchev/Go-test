@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText, type TreeNode, type User } from "./api";
+import { t } from "./i18n";
 
 type Kind = "super" | "manager";
 
@@ -33,35 +34,35 @@ export function TeamPanel({ me, clients, onMeChange }: { me: User; clients: Tree
 
   const clientName = (id: number) => clients.find((c) => c.id === id)?.name ?? `#${id}`;
   function scope(u: User) {
-    if (u.is_super) return "Всичко, вкл. настройки и екип";
-    const list = u.all_clients ? "Всички клиенти" : u.clients.length ? u.clients.map(clientName).join(", ") : "Няма клиенти";
-    const extra = [u.can_billing && "таксуване", u.can_logs && "логове"].filter(Boolean).join(", ");
+    if (u.is_super) return t("Всичко, вкл. настройки и екип");
+    const list = u.all_clients ? t("Всички клиенти") : u.clients.length ? u.clients.map(clientName).join(", ") : t("Няма клиенти");
+    const extra = [u.can_billing && t("таксуване"), u.can_logs && t("логове")].filter(Boolean).join(", ");
     return extra ? `${list} · ${extra}` : list;
   }
 
   return (
     <section>
-      <h2>Екип</h2>
+      <h2>{t("Екип")}</h2>
       <p className="muted">
-        Хората на хъба. <strong>Супер Админ</strong> може всичко. <strong>Мениджър</strong> работи с дадените му клиенти
-        (и с тези, които сам създаде): звена, потребители, кампании, одобрения и свързване на устройства.
+        {t("Хората на хъба.")} <strong>{t("Супер Админ")}</strong> {t("може всичко.")} <strong>{t("Мениджър")}</strong>{" "}
+        {t("работи с дадените му клиенти (и с тези, които сам създаде): звена, потребители, кампании, одобрения и свързване на устройства.")}
       </p>
       <div className="card">
         <table className="table">
-          <thead><tr><th>Име</th><th>Имейл</th><th>Роля</th><th>Достъп</th><th /></tr></thead>
+          <thead><tr><th>{t("Име")}</th><th>{t("Имейл")}</th><th>{t("Роля")}</th><th>{t("Достъп")}</th><th /></tr></thead>
           <tbody>
             {staff.map((u) => (
               <tr key={u.id} className={u.active ? "" : "muted"}>
-                <td>{u.name || "—"}{u.id === me.id && <span className="muted small"> (вие)</span>}</td>
+                <td>{u.name || "—"}{u.id === me.id && <span className="muted small"> {t("(вие)")}</span>}</td>
                 <td>{u.email}</td>
-                <td>{u.is_super ? "Супер Админ" : "Мениджър"}{!u.active && <span className="muted small"> · спрян</span>}</td>
+                <td>{u.is_super ? t("Супер Админ") : t("Мениджър")}{!u.active && <span className="muted small"> · {t("спрян")}</span>}</td>
                 <td className="small">{scope(u)}</td>
-                <td><button className="ghost" onClick={() => setEdit(u)}>Редакция</button></td>
+                <td><button className="ghost" onClick={() => setEdit(u)}>{t("Редакция")}</button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {edit === undefined && <p><button className="primary" onClick={() => setEdit(null)}>+ Добави човек</button></p>}
+        {edit === undefined && <p><button className="primary" onClick={() => setEdit(null)}>{t("+ Добави човек")}</button></p>}
         {error && <div className="error">{error}</div>}
       </div>
       {edit !== undefined && (
@@ -98,7 +99,7 @@ function StaffForm({ user, me, clients, onCancel, onDone }: {
         await api("POST", "/api/staff", { email, name, password, ...a });
       } else {
         if (user.id === me.id && (!active || a.kind !== "super") &&
-          !confirm("Ще загубите правата на Супер Админ и няма да виждате тази страница. Продължаване?")) return;
+          !confirm(t("Ще загубите правата на Супер Админ и няма да виждате тази страница. Продължаване?"))) return;
         await api("PATCH", `/api/staff/${user.id}`, { name, active, password: password || undefined, access: a });
       }
       await onDone();
@@ -109,29 +110,29 @@ function StaffForm({ user, me, clients, onCancel, onDone }: {
 
   return (
     <form className="card form" onSubmit={submit}>
-      <h3>{user ? `Редакция: ${user.email}` : "Нов човек в екипа"}</h3>
+      <h3>{user ? t("Редакция: {email}", { email: user.email }) : t("Нов човек в екипа")}</h3>
       <div className="grid2">
-        <label>Имейл<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!!user} /></label>
-        <label>Име<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>{user ? "Нова парола (по желание)" : "Парола"}
+        <label>{t("Имейл")}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!!user} /></label>
+        <label>{t("Име")}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label>{user ? t("Нова парола (по желание)") : t("Парола")}
           <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)}
-            required={!user} minLength={10} placeholder="поне 10 символа" />
+            required={!user} minLength={10} placeholder={t("поне 10 символа")} />
         </label>
       </div>
       <fieldset>
-        <legend>Роля</legend>
+        <legend>{t("Роля")}</legend>
         <label className="radio"><input type="radio" checked={a.kind === "super"} onChange={() => set({ kind: "super" })} />
-          Супер Админ: всичко, вкл. настройки на хъба и екипа</label>
+          {t("Супер Админ: всичко, вкл. настройки на хъба и екипа")}</label>
         <label className="radio"><input type="radio" checked={a.kind === "manager"} onChange={() => set({ kind: "manager" })} />
-          Мениджър: работи с избраните клиенти</label>
+          {t("Мениджър: работи с избраните клиенти")}</label>
       </fieldset>
       {a.kind === "manager" && (
         <fieldset>
-          <legend>Клиенти</legend>
+          <legend>{t("Клиенти")}</legend>
           <label className="check"><input type="checkbox" checked={a.all_clients} onChange={(e) => set({ all_clients: e.target.checked })} />
-            <strong>Всички клиенти</strong> (вкл. бъдещите)</label>
+            <strong>{t("Всички клиенти")}</strong> {t("(вкл. бъдещите)")}</label>
           {!a.all_clients && (
-            clients.length === 0 ? <p className="muted small">Още няма клиенти.</p> : (
+            clients.length === 0 ? <p className="muted small">{t("Още няма клиенти.")}</p> : (
               <div className="perms client-picks">
                 {clients.map((c) => (
                   <label key={c.id} className="check">
@@ -141,20 +142,20 @@ function StaffForm({ user, me, clients, onCancel, onDone }: {
               </div>
             )
           )}
-          <p className="muted small">Клиентите, които мениджърът създаде сам, се добавят към него автоматично.</p>
+          <p className="muted small">{t("Клиентите, които мениджърът създаде сам, се добавят към него автоматично.")}</p>
           <label className="check"><input type="checkbox" checked={a.can_billing} onChange={(e) => set({ can_billing: e.target.checked })} />
-            Достъп до таксуване (само за неговите клиенти)</label>
+            {t("Достъп до таксуване (само за неговите клиенти)")}</label>
           <label className="check"><input type="checkbox" checked={a.can_logs} onChange={(e) => set({ can_logs: e.target.checked })} />
-            Достъп до логовете на хъба</label>
+            {t("Достъп до логовете на хъба")}</label>
         </fieldset>
       )}
       {user && (
-        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Активен (спирането го изхвърля веднага)</label>
+        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> {t("Активен (спирането го изхвърля веднага)")}</label>
       )}
       {error && <div className="error">{error}</div>}
       <div className="buttons">
-        <button className="primary">{user ? "Запази" : "Създай"}</button>
-        <button type="button" className="ghost" onClick={onCancel}>Отказ</button>
+        <button className="primary">{user ? t("Запази") : t("Създай")}</button>
+        <button type="button" className="ghost" onClick={onCancel}>{t("Отказ")}</button>
       </div>
     </form>
   );

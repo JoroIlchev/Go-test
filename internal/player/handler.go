@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"marquee/internal/apk"
+	"marquee/internal/i18n"
 	"net"
 	"net/http"
 	"net/url"
@@ -33,7 +35,7 @@ type Handler struct {
 	log     *slog.Logger
 	cfg     Config
 	mux     *http.ServeMux
-	app     appRelease
+	app     *apk.File
 }
 
 type Config struct {
@@ -55,7 +57,7 @@ func New(st *store.Store, storage *media.Storage, log *slog.Logger, cfg Config) 
 	if cfg.RefreshSec < 60 {
 		cfg.RefreshSec = 60 // SMIL players' usual minimum
 	}
-	h := &Handler{store: st, storage: storage, log: log, cfg: cfg, mux: http.NewServeMux()}
+	h := &Handler{store: st, storage: storage, log: log, cfg: cfg, mux: http.NewServeMux(), app: apk.NewFile(cfg.AppFile)}
 	// Media by content hash. The name never changes for given bytes, so players
 	// cache forever and a new ad is simply a new URL.
 	h.mux.HandleFunc("GET /m/{file}", h.mediaFile)
@@ -148,7 +150,7 @@ func (h *Handler) serveIndex(w http.ResponseWriter, r *http.Request, d *store.De
 		if changed {
 			what := strings.Join(labels, ", ")
 			if what == "" {
-				what = "няма активни кампании"
+				what = i18n.T("няма активни кампании")
 			}
 			h.log.Info("Устройството получи ново съдържание", "устройство", deviceLabel(d, site), "кампании", what,
 				"следваща проверка", now.Add(time.Duration(refresh)*time.Second).In(h.cfg.Loc).Format("02.01 15:04"))
@@ -397,8 +399,8 @@ func statusSMIL(refresh int, page string) []byte {
 `, refresh, page))
 }
 
-var pairTmpl = template.Must(template.New("pair").Parse(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Marquee</title>
+var pairTmpl = template.Must(template.New("pair").Funcs(template.FuncMap{"t": i18n.T, "lang": i18n.Hub}).Parse(`<!doctype html>
+<html lang="{{lang}}"><head><meta charset="utf-8"><title>Marquee</title>
 <style>
 html,body{margin:0;height:100%;background:#120c1f;color:#eee;font-family:sans-serif}
 body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;
@@ -410,12 +412,12 @@ background:radial-gradient(circle at 50% 45%,#2e1a52 0,#120c1f 65%)}
 </style></head><body>
 <div class="logo"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#7c3aed"/><circle cx="32" cy="32" r="22" fill="none" stroke="#fff" stroke-width="3" opacity=".28"/><circle cx="32" cy="32" r="14" fill="none" stroke="#fff" stroke-width="3.5" opacity=".6"/><circle cx="32" cy="32" r="7" fill="#fff"/></svg>marquee</div>
 {{if eq .Status "active"}}
-<div class="hint">Устройството е свързано</div>
+<div class="hint">{{t "Устройството е свързано"}}</div>
 <div class="code" style="font-size:8vh;letter-spacing:0">{{.Name}}</div>
-<div class="hint">Очаква съдържание</div>
+<div class="hint">{{t "Очаква съдържание"}}</div>
 {{else}}
-<div class="hint">Код за свързване</div>
+<div class="hint">{{t "Код за свързване"}}</div>
 <div class="code">{{.PairingCode}}</div>
-<div class="hint">Въведете кода в marquee</div>
+<div class="hint">{{t "Въведете кода в marquee"}}</div>
 {{end}}
 </body></html>`))

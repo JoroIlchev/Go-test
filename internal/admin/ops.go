@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"marquee/internal/auth"
+	"marquee/internal/i18n"
 	"marquee/internal/ops"
 	"marquee/internal/poll"
 	"marquee/internal/store"
@@ -99,7 +100,7 @@ func (s *Server) setDefaultPoll(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	detail := "по подразбиране (-refresh)"
+	detail := i18n.T("по подразбиране (-refresh)")
 	if in.Policy != nil {
 		detail = in.Policy.Describe()
 	}
@@ -208,6 +209,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	i18n.SetHub(in.Lang)
 	s.audit(r, "settings.update", 0, "")
 	s.getSettings(w, r)
 }
@@ -226,8 +228,8 @@ func (s *Server) testMail(w http.ResponseWriter, r *http.Request) {
 	if to == "" {
 		to = userFrom(r).Email
 	}
-	err = set.SendMail(r.Context(), []string{to}, "marquee: пробно писмо",
-		"Ако четете това, известията от marquee стигат до вас.\n\n-- \nmarquee")
+	err = set.SendMail(r.Context(), []string{to}, i18n.T("marquee: пробно писмо"),
+		i18n.T("Ако четете това, известията от marquee стигат до вас.")+"\n\n-- \nmarquee")
 	if err != nil {
 		// The SMTP server's own words are the most useful diagnosis here.
 		writeErr(w, http.StatusBadGateway, "mail: "+err.Error())
@@ -299,7 +301,7 @@ func (s *Server) billing(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte{0xEF, 0xBB, 0xBF}) // Excel needs the BOM to read UTF-8 Cyrillic
 		cw := csv.NewWriter(w)
 		cw.Comma = ';' // Excel with Bulgarian regional settings
-		cw.Write([]string{"Клиент", "Устройство-дни", "Устройства през месеца", "Активни в края"})
+		cw.Write([]string{i18n.T("Клиент"), i18n.T("Устройство-дни"), i18n.T("Устройства през месеца"), i18n.T("Активни в края")})
 		for _, row := range rows {
 			cw.Write([]string{row.Name, strconv.Itoa(row.DeviceDays), strconv.Itoa(row.Devices), strconv.Itoa(row.ActiveEnd)})
 		}

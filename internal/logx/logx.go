@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"marquee/internal/i18n"
 	"os"
 	"path/filepath"
 	"slices"
@@ -79,9 +80,9 @@ func (h *Handler) Handle(_ context.Context, r slog.Record) error {
 		return true
 	})
 	if len(attrs) == 0 {
-		b.WriteString(r.Message)
+		b.WriteString(i18n.T(r.Message))
 	} else {
-		b.WriteString(pad(r.Message, msgWidth))
+		b.WriteString(pad(i18n.T(r.Message), msgWidth))
 		for _, a := range attrs {
 			writeAttr(&b, "", a)
 		}
@@ -98,7 +99,7 @@ func writeAttr(b *strings.Builder, prefix string, a slog.Attr) {
 	if a.Equal(slog.Attr{}) {
 		return
 	}
-	key := prefix + a.Key
+	key := prefix + i18n.T(a.Key)
 	if a.Value.Kind() == slog.KindGroup {
 		for _, g := range a.Value.Group() {
 			writeAttr(b, key+".", g)
@@ -119,9 +120,9 @@ func valueString(v slog.Value) string {
 		return v.Duration().String()
 	case slog.KindBool:
 		if v.Bool() {
-			return "да"
+			return i18n.T("да")
 		}
-		return "не"
+		return i18n.T("не")
 	}
 	return v.String()
 }
@@ -142,13 +143,13 @@ func quote(s string) string {
 func levelName(l slog.Level) string {
 	switch {
 	case l >= slog.LevelError:
-		return "ГРЕШКА"
+		return i18n.T("ГРЕШКА")
 	case l >= slog.LevelWarn:
-		return "ВНИМАНИЕ"
+		return i18n.T("ВНИМАНИЕ")
 	case l >= slog.LevelInfo:
-		return "ИНФО"
+		return i18n.T("ИНФО")
 	}
-	return "ДЕБЪГ"
+	return i18n.T("ДЕБЪГ")
 }
 
 func pad(s string, n int) string {

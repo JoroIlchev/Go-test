@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, errorText, type PollInfo, type PollPolicy, type TreeNode } from "./api";
+import { t } from "./i18n";
 
 /** How often the screens under a node ask for new content. */
 export function PollCard({ node }: { node: TreeNode }) {
@@ -23,30 +24,29 @@ export function PollCard({ node }: { node: TreeNode }) {
     }
   }
 
-  const source = info.own ? "зададено тук" : info.from_node_id ? `наследено от „${info.from_name}“` : "по подразбиране за системата";
+  const source = info.own ? t("зададено тук") : info.from_node_id ? t("наследено от „{name}“", { name: info.from_name ?? "" }) : t("по подразбиране за системата");
   return (
     <div className="card">
       <div className="title-row">
-        <h3>Проверка за ново съдържание</h3>
+        <h3>{t("Проверка за ново съдържание")}</h3>
         <span className="spacer" />
-        {info.can_edit && !editing && <button className="ghost" onClick={() => setEditing(true)}>Промени</button>}
+        {info.can_edit && !editing && <button className="ghost" onClick={() => setEditing(true)}>{t("Промени")}</button>}
       </div>
       {!editing && (
         <p>
-          Екраните тук проверяват <strong>{info.description}</strong> <span className="muted small">({source})</span>
+          {t("Екраните тук проверяват")} <strong>{info.description}</strong> <span className="muted small">({source})</span>
         </p>
       )}
       {editing && <PollForm initial={info.effective} canInherit={!!info.own} onSave={save} onCancel={() => setEditing(false)} />}
       {error && <div className="error">{error}</div>}
       <p className="muted small">
-        Смяната на кампания в точния час не зависи от това: екранът я има предварително и превключва сам. Проверката определя само
-        колко бързо стига нова или променена публикация. Ако екранът няма интернет в часа на проверката, опитва отново при следващата.
+        {t("Смяната на кампания в точния час не зависи от това: екранът я има предварително и превключва сам. Проверката определя само колко бързо стига нова или променена публикация. Ако екранът няма интернет в часа на проверката, опитва отново при следващата.")}
       </p>
     </div>
   );
 }
 
-export function PollForm({ initial, canInherit, inheritLabel = "Наследи отгоре", onSave, onCancel }: {
+export function PollForm({ initial, canInherit, inheritLabel = t("Наследи отгоре"), onSave, onCancel }: {
   initial: PollPolicy; canInherit: boolean; inheritLabel?: string; onSave: (p: PollPolicy | null) => void; onCancel: () => void;
 }) {
   const [mode, setMode] = useState(initial.mode);
@@ -63,25 +63,25 @@ export function PollForm({ initial, canInherit, inheritLabel = "Наследи �
     <div className="poll-form">
       <label className="radio">
         <input type="radio" checked={mode === "interval"} onChange={() => setMode("interval")} />
-        На всеки <input type="number" min={1} max={1440} value={minutes} disabled={mode !== "interval"} className="narrow"
-          onChange={(e) => setMinutes(Number(e.target.value))} /> минути
+        {t("На всеки")} <input type="number" min={1} max={1440} value={minutes} disabled={mode !== "interval"} className="narrow"
+          onChange={(e) => setMinutes(Number(e.target.value))} /> {t("минути")}
       </label>
       <label className="radio">
         <input type="radio" checked={mode === "times"} onChange={() => setMode("times")} />
-        В определени часове: <input value={times} disabled={mode !== "times"} placeholder="00:00, 12:00"
+        {t("В определени часове:")} <input value={times} disabled={mode !== "times"} placeholder="00:00, 12:00"
           onChange={(e) => setTimes(e.target.value)} />
       </label>
       {mode === "times" && (
         <label className="radio sub">
-          Разпредели устройствата в <input type="number" min={0} max={120} value={spread} className="narrow"
-            onChange={(e) => setSpread(Number(e.target.value))} /> минути след всеки час
-          <span className="muted small"> (за да не теглят всички в една секунда)</span>
+          {t("Разпредели устройствата в")} <input type="number" min={0} max={120} value={spread} className="narrow"
+            onChange={(e) => setSpread(Number(e.target.value))} /> {t("минути след всеки час")}
+          <span className="muted small"> {t("(за да не теглят всички в една секунда)")}</span>
         </label>
       )}
       <div className="inline-form">
-        <button className="primary" onClick={submit}>Запази</button>
+        <button className="primary" onClick={submit}>{t("Запази")}</button>
         {canInherit && <button className="ghost" onClick={() => onSave(null)}>{inheritLabel}</button>}
-        <button className="ghost" onClick={onCancel}>Отказ</button>
+        <button className="ghost" onClick={onCancel}>{t("Отказ")}</button>
       </div>
     </div>
   );

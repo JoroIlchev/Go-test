@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"marquee/internal/i18n"
 	"strconv"
 	"strings"
 )
@@ -91,7 +92,7 @@ func (s *Store) HouseNode(ctx context.Context) (*Node, error) {
 	if !errors.Is(err, ErrNotFound) {
 		return n, err
 	}
-	if n, err = s.CreateNode(ctx, nil, "client", "Моята реклама"); err != nil {
+	if n, err = s.CreateNode(ctx, nil, "client", i18n.T("Моята реклама")); err != nil {
 		return nil, err
 	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE nodes SET house = 1 WHERE id = ?`, n.ID); err != nil {

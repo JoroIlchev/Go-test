@@ -3,6 +3,8 @@ import { api, errorText, uploadFile, type Media, type Prep, type TreeNode, type 
 import { can, formatBytes, formatDuration, type TreeIndex } from "./model";
 import { PrepFields, prepSummary, samePrep } from "./PrepFields";
 import { SlideshowDialog } from "./SlideshowDialog";
+import { locale, t } from "./i18n";
+import { warningText } from "./mediaText";
 
 interface Props {
   me: User;
@@ -21,7 +23,7 @@ interface Upload {
 
 const ACCEPT = ".jpg,.jpeg,.png,.gif,.webp,.mp4,.m4v,.mov,.webm,.mkv,.avi,.mp3,.m4a,.aac,.ogg,.wav";
 type KindFilter = "all" | "image" | "video" | "audio";
-const kindLabel = { image: "Снимка", video: "Видео", audio: "Аудио" };
+const kindLabel = { image: "Снимка", video: "Видео", audio: "Аудио" }; // translated where shown
 
 // The processing choice is remembered per client in this browser.
 const prepKey = (clientId: number) => `marquee.prep.${clientId}`;
@@ -139,8 +141,8 @@ export function MediaLibrary({ me, idx, node }: Props) {
       {canUpload && (
         <div className={"dropzone" + (drag ? " over" : "")} onClick={() => inputRef.current?.click()}
           role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}>
-          <strong>Пуснете файлове тук</strong> или натиснете за избор
-          <span className="muted small">Снимки (JPG, PNG, GIF), видео (MP4, MOV…) и аудио (MP3, AAC). Качват се в „{node.name}“ и се виждат от всичко под него.</span>
+          <strong>{t("Пуснете файлове тук")}</strong> {t("или натиснете за избор")}
+          <span className="muted small">{t("Снимки (JPG, PNG, GIF), видео (MP4, MOV…) и аудио (MP3, AAC). Качват се в „{name}“ и се виждат от всичко под него.", { name: node.name })}</span>
           <input ref={inputRef} type="file" multiple accept={ACCEPT} hidden
             onChange={(e) => { if (e.target.files?.length) uploadAll([...e.target.files]); e.target.value = ""; }} />
         </div>
@@ -148,23 +150,21 @@ export function MediaLibrary({ me, idx, node }: Props) {
       {canUpload && ffmpeg && prep && (
         <details className="prep">
           <summary>
-            ⚙ Обработка при качване: <strong>{prepSummary(prep)}</strong>
-            <span className="muted small">{ownPrep ? " — ваш избор" : " — по подразбиране"}</span>
+            ⚙ {t("Обработка при качване:")} <strong>{prepSummary(prep)}</strong>
+            <span className="muted small"> — {ownPrep ? t("ваш избор") : t("по подразбиране")}</span>
           </summary>
           <p className="muted small">
-            Важи за следващите файлове, които качвате тук (запомня се за този клиент в този браузър). Качените вече
-            файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете
-            „Без смаляване“ преди качването.
+            {t("Важи за следващите файлове, които качвате тук (запомня се за този клиент в този браузър). Качените вече файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете „Без смаляване“ преди качването.")}
           </p>
           <PrepFields value={prep} onChange={changePrep} />
           {ownPrep && (
             <p><button className="ghost" onClick={() => { setOwnPrep(null); storePrep(node.client_id, null); }}>
-              Върни по подразбиране
+              {t("Върни по подразбиране")}
             </button></p>
           )}
         </details>
       )}
-      {!ffmpeg && <div className="notice">На сървъра няма ffmpeg: видеата се качват, но не се проверяват и нямат миниатюри.</div>}
+      {!ffmpeg && <div className="notice">{t("На сървъра няма ffmpeg: видеата се качват, но не се проверяват и нямат миниатюри.")}</div>}
 
       {uploads.length > 0 && (
         <ul className="uploads">
@@ -185,27 +185,27 @@ export function MediaLibrary({ me, idx, node }: Props) {
         <div className="seg">
           {(["all", "image", "video", "audio"] as KindFilter[]).map((k) => (
             <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>
-              {k === "all" ? "Всички" : kindLabel[k]}
+              {k === "all" ? t("Всички") : t(kindLabel[k])}
             </button>
           ))}
         </div>
-        <input className="search" placeholder="Търсене…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <label className="check small"><input type="checkbox" checked={onlyHere} onChange={(e) => setOnlyHere(e.target.checked)} /> само от това звено</label>
+        <input className="search" placeholder={t("Търсене…")} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <label className="check small"><input type="checkbox" checked={onlyHere} onChange={(e) => setOnlyHere(e.target.checked)} /> {t("само от това звено")}</label>
         <span className="spacer" />
-        {canUpload && ffmpeg && <button className="ghost" onClick={() => setSlideshow(true)}>🎬 Видео от снимки</button>}
-        <span className="muted small">{items.length} файла · {formatBytes(totalSize)} тук</span>
+        {canUpload && ffmpeg && <button className="ghost" onClick={() => setSlideshow(true)}>🎬 {t("Видео от снимки")}</button>}
+        <span className="muted small">{t("{n} файла · {size} тук", { n: items.length, size: formatBytes(totalSize) })}</span>
       </div>
       {error && <div className="error">{error}</div>}
 
-      {shown.length === 0 ? <p className="muted">{items.length === 0 ? "Още няма качени файлове." : "Нищо не отговаря на филтъра."}</p> : (
+      {shown.length === 0 ? <p className="muted">{items.length === 0 ? t("Още няма качени файлове.") : t("Нищо не отговаря на филтъра.")}</p> : (
         <div className="media-grid">
           {shown.map((m) => (
             <MediaCard key={m.id} m={m} inherited={m.node_id !== node.id} onPreview={() => setPreview(m)}
               onRename={() => {
-                const name = prompt("Ново име", m.name);
+                const name = prompt(t("Ново име"), m.name);
                 if (name && name !== m.name) act(() => api("PATCH", `/api/media/${m.id}`, { name }));
               }}
-              onDelete={() => confirm(`Да изтрия ли „${m.name}“?`) && act(() => api("DELETE", `/api/media/${m.id}`))}
+              onDelete={() => confirm(t("Да изтрия ли „{name}“?", { name: m.name })) && act(() => api("DELETE", `/api/media/${m.id}`))}
               onConvert={() => act(() => api("POST", `/api/media/${m.id}/convert`))} />
           ))}
         </div>
@@ -238,40 +238,40 @@ function MediaCard({ m, inherited, onPreview, onRename, onDelete, onConvert }: {
 
   return (
     <div className={"media-card" + (m.status === "failed" ? " failed" : "")}>
-      <button className="thumb" onClick={onPreview} disabled={m.status !== "ready"} title="Преглед">
+      <button className="thumb" onClick={onPreview} disabled={m.status !== "ready"} title={t("Преглед")}>
         {m.has_thumb ? <img src={`/api/media/${m.id}/thumb`} alt="" loading="lazy" /> : (
           <span className="thumb-icon">{m.kind === "audio" ? "♪" : m.kind === "video" ? "▶" : "▣"}</span>
         )}
-        <span className="kind-tag">{kindLabel[m.kind]}</span>
+        <span className="kind-tag">{t(kindLabel[m.kind])}</span>
         {m.kind === "video" && m.duration_ms > 0 && <span className="dur-tag">{formatDuration(m.duration_ms)}</span>}
       </button>
       <div className="media-body">
         <div className="media-name" title={m.name}>{m.name}</div>
         <div className="muted small">{meta || " "}</div>
-        {inherited && <div className="muted small">от „{m.owner_name}“</div>}
+        {inherited && <div className="muted small">{t("от „{name}“", { name: m.owner_name })}</div>}
         <div className="status-row">
-          {m.status === "processing" && <span className="tag busy">{m.source_id ? "Конвертиране…" : "Проверка…"}</span>}
-          {m.status === "failed" && <span className="tag bad" title={m.error}>Грешка</span>}
-          {m.status === "ready" && problems.length === 0 && <span className="tag good">✓ Съвместимо</span>}
+          {m.status === "processing" && <span className="tag busy">{m.source_id ? t("Конвертиране…") : t("Проверка…")}</span>}
+          {m.status === "failed" && <span className="tag bad" title={m.error}>{t("Грешка")}</span>}
+          {m.status === "ready" && problems.length === 0 && <span className="tag good">✓ {t("Съвместимо")}</span>}
           {m.status === "ready" && problems.length > 0 && (
             <button className={"tag " + (errors.length ? "bad" : "warn")} onClick={() => setOpen(!open)}>
-              {errors.length ? "✕ Няма да тръгне" : "⚠ Внимание"} ({problems.length})
+              {errors.length ? "✕ " + t("Няма да тръгне") : "⚠ " + t("Внимание")} ({problems.length})
             </button>
           )}
           {m.status === "ready" && notes > 0 && (
-            <button className="tag" onClick={() => setOpen(!open)} title="Какво направи хъбът с файла">ⓘ Обработен</button>
+            <button className="tag" onClick={() => setOpen(!open)} title={t("Какво направи хъбът с файла")}>ⓘ {t("Обработен")}</button>
           )}
         </div>
         {m.status === "failed" && <div className="error small">{m.error}</div>}
         {open && (
           <ul className="warnings">
-            {m.warnings.map((w) => <li key={w.code} className={w.level}>{w.message}</li>)}
+            {m.warnings.map((w) => <li key={w.code} className={w.level}>{warningText(w)}</li>)}
           </ul>
         )}
         <div className="card-actions">
-          {m.convertible && <button className="primary small-btn" onClick={onConvert}>Конвертирай за Android</button>}
-          {m.can_edit && <button className="link small" onClick={onRename}>Преименувай</button>}
-          {m.can_edit && <button className="link small danger" onClick={onDelete}>Изтрий</button>}
+          {m.convertible && <button className="primary small-btn" onClick={onConvert}>{t("Конвертирай за Android")}</button>}
+          {m.can_edit && <button className="link small" onClick={onRename}>{t("Преименувай")}</button>}
+          {m.can_edit && <button className="link small danger" onClick={onDelete}>{t("Изтрий")}</button>}
         </div>
       </div>
     </div>
@@ -291,8 +291,8 @@ function Preview({ m, onClose }: { m: Media; onClose: () => void }) {
         <div className="title-row">
           <h3>{m.name}</h3>
           <span className="spacer" />
-          <a className="ghost btn-link" href={src + "?download"}>Изтегли</a>
-          <button className="ghost" onClick={onClose}>Затвори</button>
+          <a className="ghost btn-link" href={src + "?download"}>{t("Изтегли")}</a>
+          <button className="ghost" onClick={onClose}>{t("Затвори")}</button>
         </div>
         <div className="preview-body">
           {m.kind === "image" && <img src={src} alt={m.name} />}
@@ -300,11 +300,11 @@ function Preview({ m, onClose }: { m: Media; onClose: () => void }) {
           {m.kind === "audio" && <audio src={src} controls autoPlay />}
         </div>
         <dl className="facts small">
-          {m.video_codec && <><dt>Видео</dt><dd>{m.video_codec.toUpperCase()} {m.width}×{m.height}{m.fps > 0 && `, ${m.fps.toFixed(0)} fps`}</dd></>}
-          {m.audio_codec && <><dt>Аудио</dt><dd>{m.audio_codec.toUpperCase()}</dd></>}
-          {m.bitrate > 0 && <><dt>Битрейт</dt><dd>{(m.bitrate / 1e6).toFixed(1)} Mbps</dd></>}
-          <dt>Размер</dt><dd>{formatBytes(m.size)}</dd>
-          <dt>Качено</dt><dd>{new Date(m.created_at).toLocaleString("bg-BG")}</dd>
+          {m.video_codec && <><dt>{t("Видео")}</dt><dd>{m.video_codec.toUpperCase()} {m.width}×{m.height}{m.fps > 0 && `, ${m.fps.toFixed(0)} fps`}</dd></>}
+          {m.audio_codec && <><dt>{t("Аудио")}</dt><dd>{m.audio_codec.toUpperCase()}</dd></>}
+          {m.bitrate > 0 && <><dt>{t("Битрейт")}</dt><dd>{(m.bitrate / 1e6).toFixed(1)} Mbps</dd></>}
+          <dt>{t("Размер")}</dt><dd>{formatBytes(m.size)}</dd>
+          <dt>{t("Качено")}</dt><dd>{new Date(m.created_at).toLocaleString(locale())}</dd>
         </dl>
       </div>
     </div>

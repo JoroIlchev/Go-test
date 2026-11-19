@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"marquee/internal/i18n"
 	"slices"
 	"strconv"
 	"strings"
@@ -119,16 +120,16 @@ func (p Policy) JSON() string {
 	return string(b)
 }
 
-// Describe is a short Bulgarian summary for the UI and logs.
+// Describe is a short summary in the hub language for the UI and logs.
 func (p Policy) Describe() string {
 	if p.Mode == "times" {
-		s := "в " + strings.Join(p.Times, ", ")
+		s := i18n.T("в") + " " + strings.Join(p.Times, ", ")
 		if p.SpreadMin > 0 {
-			s += fmt.Sprintf(" (разпределени в %d мин)", p.SpreadMin)
+			s += i18n.Tf(" (разпределени в %d мин)", p.SpreadMin)
 		}
 		return s
 	}
-	return fmt.Sprintf("на всеки %d мин", p.Minutes)
+	return i18n.Tf("на всеки %d мин", p.Minutes)
 }
 
 func clock(s string) (int, error) {

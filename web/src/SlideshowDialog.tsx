@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, errorText, type Media, type Slide, type Slideshow, type TextStyle } from "./api";
 import { formatDuration } from "./model";
+import { locale, t } from "./i18n";
 
 interface Props {
   nodeId: number;
@@ -14,6 +15,7 @@ interface Props {
   onCreated: (m: Media, sh: Slideshow, replace: boolean) => void;
 }
 
+// Labels are Bulgarian keys, translated where shown.
 const TRANSITIONS: [string, string][] = [
   ["fade", "Плавно преливане"],
   ["fadeblack", "През черно"],
@@ -43,7 +45,7 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
   const images = library.filter((m) => m.kind === "image" && m.status === "ready");
   const audios = library.filter((m) => m.kind === "audio" && m.status === "ready");
   const byId = new Map(library.map((m) => [m.id, m]));
-  const [name, setName] = useState(initialName ?? "Слайдшоу");
+  const [name, setName] = useState(initialName ?? t("Слайдшоу"));
   const [sh, setSh] = useState<Slideshow>({
     items: [], transition: "fade", transition_s: 1, motion: true, background: "blur", portrait: false, repeat_to_s: 60,
     text_style: { font: "arial", size: "m", color: "#ffffff", box: "dark" }, ...initial,
@@ -96,16 +98,16 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
     <div className="modal-back" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="title-row">
-          <h3>🎬 Направи видео от снимки</h3>
+          <h3>🎬 {t("Направи видео от снимки")}</h3>
           <span className="spacer" />
-          <button className="ghost" onClick={onClose}>Затвори</button>
+          <button className="ghost" onClick={onClose}>{t("Затвори")}</button>
         </div>
 
         <div className="ss-grid">
           <div>
-            <label>Име на видеото<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <h4>Снимки по ред</h4>
-            {items.length === 0 ? <div className="empty-playlist">Натиснете снимки отдолу, за да ги добавите.</div> : (
+            <label>{t("Име на видеото")}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <h4>{t("Снимки по ред")}</h4>
+            {items.length === 0 ? <div className="empty-playlist">{t("Натиснете снимки отдолу, за да ги добавите.")}</div> : (
               <ol className="playlist">
                 {items.map((it, i) => {
                   const m = byId.get(it.media_id);
@@ -116,19 +118,19 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
                       <span className="pl-name">{m?.name ?? `#${it.media_id}`}</span>
                       <label className="dur">
                         <input type="number" min={1} max={120} value={it.duration_s}
-                          onChange={(e) => setItem(i, { duration_s: Number(e.target.value) })} /> сек
+                          onChange={(e) => setItem(i, { duration_s: Number(e.target.value) })} /> {t("сек")}
                       </label>
                       <span className="pl-actions">
-                        <button className="ghost icon" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label="Нагоре">↑</button>
-                        <button className="ghost icon" disabled={i === items.length - 1} onClick={() => move(i, i + 1)} aria-label="Надолу">↓</button>
-                        <button className="ghost icon danger" onClick={(e) => { e.stopPropagation(); set({ items: items.filter((_, j) => j !== i) }); }} aria-label="Махни">✕</button>
+                        <button className="ghost icon" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label={t("Нагоре")}>↑</button>
+                        <button className="ghost icon" disabled={i === items.length - 1} onClick={() => move(i, i + 1)} aria-label={t("Надолу")}>↓</button>
+                        <button className="ghost icon danger" onClick={(e) => { e.stopPropagation(); set({ items: items.filter((_, j) => j !== i) }); }} aria-label={t("Махни")}>✕</button>
                       </span>
                       <div className="slide-text">
-                        <textarea rows={it.text?.includes("\n") ? 2 : 1} maxLength={300} value={it.text ?? ""} placeholder="Текст върху снимката (по желание)"
+                        <textarea rows={it.text?.includes("\n") ? 2 : 1} maxLength={300} value={it.text ?? ""} placeholder={t("Текст върху снимката (по желание)")}
                           onFocus={() => setSel(i)} onChange={(e) => setItem(i, { text: e.target.value })} />
                         {it.text?.trim() && (
                           <select value={it.text_pos ?? "bottom"} onChange={(e) => setItem(i, { text_pos: e.target.value as Slide["text_pos"] })}>
-                            {POSITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            {POSITIONS.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                           </select>
                         )}
                       </div>
@@ -145,7 +147,7 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
                   <span className="pick-name">{m.name}</span>
                 </button>
               ))}
-              {images.length === 0 && <p className="muted small">Няма готови снимки. Качете ги от раздел „Медия“.</p>}
+              {images.length === 0 && <p className="muted small">{t("Няма готови снимки. Качете ги от раздел „Медия“.")}</p>}
             </div>
           </div>
 
@@ -163,106 +165,105 @@ export function SlideshowDialog({ nodeId, library, initial, initialName, replace
                 }}>{shown.text.trim()}</div>
               )}
             </div>
-            {items.length > 1 && <span className="muted small">Показана е снимка {cur + 1}. Натиснете друга в списъка, за да я видите.</span>}
+            {items.length > 1 && <span className="muted small">{t("Показана е снимка {n}. Натиснете друга в списъка, за да я видите.", { n: cur + 1 })}</span>}
 
             {hasText && (
               <fieldset>
-                <legend>Текст</legend>
+                <legend>{t("Текст")}</legend>
                 <div className="grid2">
-                  <label>Шрифт
+                  <label>{t("Шрифт")}
                     <select value={st.font} onChange={(e) => setStyle({ font: e.target.value as TextStyle["font"] })}>
-                      {FONTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      {FONTS.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                     </select>
                   </label>
-                  <label>Размер
+                  <label>{t("Размер")}
                     <select value={st.size} onChange={(e) => setStyle({ size: e.target.value as TextStyle["size"] })}>
-                      {SIZES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      {SIZES.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                     </select>
                   </label>
                 </div>
                 <div className="swatches">
-                  <span className="small">Цвят</span>
+                  <span className="small">{t("Цвят")}</span>
                   {COLORS.map((c) => (
                     <button key={c} type="button" className={"swatch" + (st.color.toLowerCase() === c ? " on" : "")}
                       style={{ background: c }} onClick={() => setStyle({ color: c })} aria-label={c} />
                   ))}
-                  <input type="color" value={st.color} onChange={(e) => setStyle({ color: e.target.value })} title="Друг цвят" />
+                  <input type="color" value={st.color} onChange={(e) => setStyle({ color: e.target.value })} title={t("Друг цвят")} />
                 </div>
-                <label className="radio"><input type="radio" checked={st.box === "dark"} onChange={() => setStyle({ box: "dark" })} /> Върху тъмна лента</label>
-                <label className="radio"><input type="radio" checked={st.box === "light"} onChange={() => setStyle({ box: "light" })} /> Върху светла лента</label>
-                <label className="radio"><input type="radio" checked={st.box === "none"} onChange={() => setStyle({ box: "none" })} /> Без лента, с контур</label>
+                <label className="radio"><input type="radio" checked={st.box === "dark"} onChange={() => setStyle({ box: "dark" })} /> {t("Върху тъмна лента")}</label>
+                <label className="radio"><input type="radio" checked={st.box === "light"} onChange={() => setStyle({ box: "light" })} /> {t("Върху светла лента")}</label>
+                <label className="radio"><input type="radio" checked={st.box === "none"} onChange={() => setStyle({ box: "none" })} /> {t("Без лента, с контур")}</label>
               </fieldset>
             )}
 
-            <label>Преход между снимките
+            <label>{t("Преход между снимките")}
               <select value={sh.transition} onChange={(e) => set({ transition: e.target.value })}>
-                {TRANSITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {TRANSITIONS.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
               </select>
             </label>
             {sh.transition !== "none" && (
-              <label>Продължителност на прехода
+              <label>{t("Продължителност на прехода")}
                 <select value={sh.transition_s} onChange={(e) => set({ transition_s: Number(e.target.value) })}>
-                  {[0.5, 1, 1.5, 2].map((s) => <option key={s} value={s}>{s.toLocaleString("bg-BG")} сек</option>)}
+                  {[0.5, 1, 1.5, 2].map((s) => <option key={s} value={s}>{s.toLocaleString(locale())} {t("сек")}</option>)}
                 </select>
               </label>
             )}
             <label className="check">
               <input type="checkbox" checked={sh.motion} onChange={(e) => set({ motion: e.target.checked })} />
-              Бавно приближаване и отдалечаване (оживява снимките)
+              {t("Бавно приближаване и отдалечаване (оживява снимките)")}
             </label>
 
             <fieldset>
-              <legend>Когато снимката не е с формата на екрана</legend>
+              <legend>{t("Когато снимката не е с формата на екрана")}</legend>
               <label className="radio"><input type="radio" checked={sh.background === "blur"} onChange={() => set({ background: "blur" })} />
-                Цялата снимка, отстрани размазано копие</label>
+                {t("Цялата снимка, отстрани размазано копие")}</label>
               <label className="radio"><input type="radio" checked={sh.background === "black"} onChange={() => set({ background: "black" })} />
-                Цялата снимка, черни ленти</label>
+                {t("Цялата снимка, черни ленти")}</label>
               <label className="radio"><input type="radio" checked={sh.background === "crop"} onChange={() => set({ background: "crop" })} />
-                Запълва екрана, изрязва краищата</label>
+                {t("Запълва екрана, изрязва краищата")}</label>
             </fieldset>
 
             <fieldset>
-              <legend>Екран</legend>
+              <legend>{t("Екран")}</legend>
               <label className="radio"><input type="radio" checked={!sh.portrait} onChange={() => set({ portrait: false })} />
-                Хоризонтален (1920×1080)</label>
+                {t("Хоризонтален (1920×1080)")}</label>
               <label className="radio"><input type="radio" checked={sh.portrait} onChange={() => set({ portrait: true })} />
-                Вертикален (1080×1920)</label>
+                {t("Вертикален (1080×1920)")}</label>
             </fieldset>
 
-            <label>Музика
+            <label>{t("Музика")}
               <select value={sh.audio_id ?? 0} onChange={(e) => set({ audio_id: Number(e.target.value) || undefined })}>
-                <option value={0}>Без музика</option>
+                <option value={0}>{t("Без музика")}</option>
                 {audios.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </label>
 
-            <label>Повтори снимките във видеото, докато стане поне
+            <label>{t("Повтори снимките във видеото, докато стане поне")}
               <select value={sh.repeat_to_s ?? 0} onChange={(e) => set({ repeat_to_s: Number(e.target.value) || undefined })}>
-                <option value={0}>Без повторение</option>
-                {[60, 120, 300, 600].map((s) => <option key={s} value={s}>{s / 60} мин</option>)}
+                <option value={0}>{t("Без повторение")}</option>
+                {[60, 120, 300, 600].map((s) => <option key={s} value={s}>{t("{n} мин", { n: s / 60 })}</option>)}
               </select>
             </label>
             <p className="muted small">
-              Кратък клип, който плейърът пуска отначало пак и пак, мига в черно при всяко повторение и на някои устройства
-              натоварва паметта. По-дългият файл се върти гладко.
+              {t("Кратък клип, който плейърът пуска отначало пак и пак, мига в черно при всяко повторение и на някои устройства натоварва паметта. По-дългият файл се върти гладко.")}
             </p>
           </div>
         </div>
 
         {error && <div className="error">{error}</div>}
-        {tooShort && <div className="notice small">Всяка снимка трябва да стои по-дълго от прехода ({sh.transition_s.toLocaleString("bg-BG")} сек).</div>}
+        {tooShort && <div className="notice small">{t("Всяка снимка трябва да стои по-дълго от прехода ({s} сек).", { s: sh.transition_s.toLocaleString(locale()) })}</div>}
         <div className="title-row">
-          <span className="muted">Дължина: <strong>{formatDuration(total * 1000)}</strong>{items.length > 0 && ` · ${items.length} снимки`}
-            {repeats > 1 && <> · повторено {repeats}× = <strong>{formatDuration(total * repeats * 1000)}</strong></>}</span>
+          <span className="muted">{t("Дължина:")} <strong>{formatDuration(total * 1000)}</strong>{items.length > 0 && ` · ${t("{n} снимки", { n: items.length })}`}
+            {repeats > 1 && <> · {t("повторено {n}× =", { n: repeats })} <strong>{formatDuration(total * repeats * 1000)}</strong></>}</span>
           <span className="spacer" />
           {replaceLabel && (
             <label className="check small"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> {replaceLabel}</label>
           )}
           <button className="primary" disabled={busy || items.length === 0 || tooShort} onClick={submit}>
-            {busy ? "Изпращане…" : "Направи видео"}
+            {busy ? t("Изпращане…") : t("Направи видео")}
           </button>
         </div>
-        <p className="muted small">Видеото се прави на сървъра (обикновено под минута) и се появява в библиотеката като ново видео. Снимките остават непроменени.</p>
+        <p className="muted small">{t("Видеото се прави на сървъра (обикновено под минута) и се появява в библиотеката като ново видео. Снимките остават непроменени.")}</p>
       </div>
     </div>
   );

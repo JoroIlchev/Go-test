@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type Kind = "client" | "group" | "site";
 
 export interface Role {
@@ -23,6 +25,7 @@ export interface User {
   client_id: number | null;
   active: boolean;
   created_at: string;
+  lang?: "bg" | "en";
   roles: Role[];
 }
 
@@ -81,6 +84,7 @@ export interface Tree {
   devices: Device[];
   server_time: string;
   hub_url?: string; // super admin only
+  player_app?: string; // Marquee Player version the hub hands out
 }
 
 export interface MediaWarning {
@@ -343,7 +347,8 @@ export async function api<T = void>(method: string, path: string, body?: unknown
   return res.json() as Promise<T>;
 }
 
-// Server messages are English; show the common ones in Bulgarian.
+// Server messages are English; show the common ones in Bulgarian, or in
+// nicer English through t() (see i18n/en/shell.ts).
 const messages: Record<string, string> = {
   "wrong e-mail or password": "Грешен имейл или парола",
   "too many failed attempts, try again later": "Твърде много грешни опити. Опитайте след 15 минути.",
@@ -424,10 +429,10 @@ export interface TextStyle {
 
 export function errorText(e: unknown): string {
   if (e instanceof ApiError) {
-    if (messages[e.message]) return messages[e.message];
+    if (messages[e.message]) return t(messages[e.message]);
     const m = /^media "(.+)" is not (ready yet|available here)$/.exec(e.message);
-    if (m) return m[2] === "ready yet" ? `„${m[1]}“ още се обработва` : `„${m[1]}“ не е достъпен за това звено`;
-    return e.message;
+    if (m) return m[2] === "ready yet" ? t("„{name}“ още се обработва", { name: m[1] }) : t("„{name}“ не е достъпен за това звено", { name: m[1] });
+    return t(e.message);
   }
   return String(e);
 }

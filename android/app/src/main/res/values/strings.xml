@@ -1,4 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bulgarian, the default. The hub picks the language (manifest "lang"); see values-en. -->
 <resources>
-    <string name="app_name">Marquee Player</string>
+    <string name="app_name" translatable="false">Marquee Player</string>
+    <string name="no_hub">без хъб</string>
+    <string name="welcome">Добре дошли</string>
+    <string name="setup">Настройка</string>
+    <string name="enter_hub">Въведете адреса на хъба</string>
+    <string name="blocked">Блокирано</string>
+    <string name="blocked_hint">Устройството е блокирано в хъба</string>
+    <string name="offline">Няма връзка с хъба</string>
+    <string name="offline_hint">Опитва отново… · задръжте 3 сек. за настройки</string>
+    <string name="connecting">Свързване…</string>
+    <string name="pairing_code">Код за свързване</string>
+    <string name="pairing_hint">Въведете кода в marquee → Чакащи устройства</string>
+    <string name="downloading">Сваляне на съдържанието</string>
+    <string name="files_of">%1$d от %2$d</string>
+    <string name="paired">Устройството е свързано</string>
+    <string name="no_name">Без име</string>
+    <string name="waiting">Очаква съдържание</string>
+    <string name="about">Устройство %1$s · версия %2$s</string>
+    <string name="hub_label">Адрес на хъба, например 192.168.1.10:8080</string>
+    <string name="settings_title">Настройки на Marquee Player</string>
+    <string name="save">Запази</string>
+    <string name="cancel">Отказ</string>
 </resources>

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"marquee/internal/i18n"
 )
 
 func TestFormat(t *testing.T) {
@@ -34,6 +36,21 @@ func TestFormat(t *testing.T) {
 	}
 	if !strings.Contains(lines[2], `грешка="ред1 ⏎ ред2" готово=не`) {
 		t.Errorf("error line: %q", lines[2])
+	}
+}
+
+// In the English hub the same calls come out in English.
+func TestFormatEnglish(t *testing.T) {
+	i18n.Register(map[string]string{"Устройството получи ново съдържание": "The device received new content"})
+	i18n.SetHub("en")
+	defer i18n.SetHub("bg")
+	var b strings.Builder
+	log := slog.New(New(&b, slog.LevelInfo))
+	log.Info("Устройството получи ново съдържание", "устройство", "Bar", "готово", true)
+	log.Warn("без превод")
+	if got := b.String(); !strings.Contains(got, "INFO      The device received new content          device=Bar готово=yes") ||
+		!strings.Contains(got, "WARN      без превод") {
+		t.Errorf("got:\n%s", got)
 	}
 }
 

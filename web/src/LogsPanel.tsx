@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "./api";
+import { t } from "./i18n";
 
 interface Logs {
   day: string;
@@ -10,7 +11,8 @@ interface Logs {
 }
 
 type Level = "all" | "warn" | "error";
-const LEVEL_OF: [string, Level][] = [["ГРЕШКА", "error"], ["ВНИМАНИЕ", "warn"]];
+// Level words as the hub writes them, in either hub language.
+const LEVEL_OF: [string, Level][] = [["ГРЕШКА", "error"], ["ERROR", "error"], ["ВНИМАНИЕ", "warn"], ["WARN", "warn"]];
 
 /** The hub's log for a day, newest first, with a level filter and search. */
 export function LogsPanel() {
@@ -36,31 +38,31 @@ export function LogsPanel() {
   return (
     <section>
       <div className="title-row">
-        <h2>Логове</h2>
+        <h2>{t("Логове")}</h2>
         <span className="spacer" />
         <select value={logs?.day ?? ""} onChange={(e) => setDay(e.target.value)}>
           {(logs?.days.length ? logs.days : [logs?.day ?? ""]).map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
-        <button className="ghost" onClick={load}>Обнови</button>
+        <button className="ghost" onClick={load}>{t("Обнови")}</button>
       </div>
       {error && <div className="error">{error}</div>}
       <div className="toolbar">
         <div className="seg">
-          <button className={level === "all" ? "on" : ""} onClick={() => setLevel("all")}>Всички</button>
-          <button className={level === "warn" ? "on" : ""} onClick={() => setLevel("warn")}>Внимание и грешки</button>
-          <button className={level === "error" ? "on" : ""} onClick={() => setLevel("error")}>Само грешки</button>
+          <button className={level === "all" ? "on" : ""} onClick={() => setLevel("all")}>{t("Всички")}</button>
+          <button className={level === "warn" ? "on" : ""} onClick={() => setLevel("warn")}>{t("Внимание и грешки")}</button>
+          <button className={level === "error" ? "on" : ""} onClick={() => setLevel("error")}>{t("Само грешки")}</button>
         </div>
-        <input className="search" placeholder="Търсене…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="search" placeholder={t("Търсене…")} value={query} onChange={(e) => setQuery(e.target.value)} />
         <span className="spacer" />
-        <span className="muted small">{shown.length} реда, най-новите отгоре</span>
+        <span className="muted small">{t("{n} реда, най-новите отгоре", { n: shown.length })}</span>
       </div>
-      {logs?.truncated && <p className="muted small">Показани са последните 5000 реда от деня.</p>}
+      {logs?.truncated && <p className="muted small">{t("Показани са последните 5000 реда от деня.")}</p>}
       <div className="log-view">
-        {shown.length === 0 ? <div className="muted">Няма записи.</div> : shown.map((l, i) => (
+        {shown.length === 0 ? <div className="muted">{t("Няма записи.")}</div> : shown.map((l, i) => (
           <div key={i} className={"log-line lv-" + lineLevel(l)}>{l}</div>
         ))}
       </div>
-      {logs && <p className="muted small">Файл: <span className="mono">{logs.file}</span>. Отваря се и с Notepad. Пазят се 90 дни.</p>}
+      {logs && <p className="muted small">{t("Файл:")} <span className="mono">{logs.file}</span>. {t("Отваря се и с Notepad. Пазят се 90 дни.")}</p>}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"marquee/internal/apk"
 	"net"
 	"net/http"
 	"strconv"
@@ -43,6 +44,7 @@ type Server struct {
 	worker       *media.Worker
 	maxUpload    int64
 	loc          *time.Location
+	app          *apk.File
 	defaultPoll  poll.Policy
 	backup       *ops.Backup
 	mux          *http.ServeMux
@@ -66,6 +68,9 @@ type Config struct {
 	// DefaultPoll applies to devices under nodes without their own policy.
 	DefaultPoll poll.Policy
 	Backup      *ops.Backup
+	// AppFile is the Marquee Player APK the hub hands out; its version is
+	// shown next to the one each device runs.
+	AppFile string
 }
 
 func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
@@ -84,6 +89,7 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 		loc:          cfg.Loc,
 		defaultPoll:  cfg.DefaultPoll,
 		backup:       cfg.Backup,
+		app:          apk.NewFile(cfg.AppFile),
 		mux:          http.NewServeMux(),
 	}
 	if s.playerScheme == "" {
@@ -99,6 +105,7 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/login", s.login)
 	s.mux.HandleFunc("POST /api/logout", s.logout)
 	s.mux.Handle("GET /api/me", s.authed(s.me))
+	s.mux.Handle("PUT /api/me/lang", s.authed(s.setLang))
 
 	s.mux.Handle("GET /api/tree", s.authed(s.tree))
 	s.mux.Handle("POST /api/nodes", s.authed(s.createNode))
@@ -270,6 +277,25 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, userFrom(r))
+}
+
+// setLang remembers the admin language, so it follows the user to other devices.
+func (s *Server) setLang(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Lang string `json:"lang"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if in.Lang != "bg" && in.Lang != "en" {
+		writeErr(w, http.StatusBadRequest, "lang must be bg or en")
+		return
+	}
+	if err := s.store.SetUserLang(r.Context(), userFrom(r).ID, in.Lang); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- helpers ---

@@ -3,6 +3,7 @@ package admin
 import (
 	"bufio"
 	"context"
+	"marquee/internal/i18n"
 	"net"
 	"net/http"
 	"os"
@@ -65,7 +66,7 @@ func (s *Server) audit(r *http.Request, action string, nodeID int64, detail stri
 	if detail != "" {
 		args = append(args, "какво", detail)
 	}
-	s.log.Info(label, args...)
+	s.log.Info(i18n.T(label), args...)
 }
 
 var actionLabels = map[string]string{

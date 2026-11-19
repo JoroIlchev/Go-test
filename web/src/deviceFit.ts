@@ -1,5 +1,6 @@
 import type { CampaignSpec, Device, Media } from "./api";
 import { formatBytes, type TreeIndex } from "./model";
+import { t } from "./i18n";
 
 /** Problems the campaign will have on the targeted screens, from what the
  *  Marquee Player reported about them (other players report nothing). */
@@ -28,7 +29,9 @@ export function fitWarnings(spec: CampaignSpec, idx: TreeIndex, byId: Map<number
       const i = d.info!;
       return i.screen_w > 0 && i.screen_h > 0 && portrait !== i.screen_h > i.screen_w;
     });
-    add(`„${m.name}“ е ${portrait ? "вертикален" : "хоризонтален"}, а екранът не е — ще ${spec.fit === "slice" ? "се изреже" : spec.fit === "fill" ? "се разтегне" : "има черни ленти"}`, turned);
+    const effect = spec.fit === "slice" ? t("ще се изреже") : spec.fit === "fill" ? t("ще се разтегне") : t("ще има черни ленти");
+    add(t(portrait ? "„{name}“ е вертикален, а екранът не е — {effect}" : "„{name}“ е хоризонтален, а екранът не е — {effect}",
+      { name: m.name, effect }), turned);
     if (m.kind !== "video" || !m.width) continue;
     const big = devices.filter((d) => {
       const i = d.info!;
@@ -36,11 +39,12 @@ export function fitWarnings(spec: CampaignSpec, idx: TreeIndex, byId: Map<number
       const fits = (m.width <= i.video_max_w && m.height <= i.video_max_h) || (m.width <= i.video_max_h && m.height <= i.video_max_w);
       return !fits;
     });
-    add(`„${m.name}“ (${m.width}×${m.height}) е по-голямо, отколкото устройството може да пусне`, big, " — конвертирайте го до 1080p");
-    if (m.video_codec === "hevc") add(`„${m.name}“ е H.265, а устройството не го поддържа`, devices.filter((d) => !d.info!.hevc));
+    add(t("„{name}“ ({w}×{h}) е по-голямо, отколкото устройството може да пусне", { name: m.name, w: m.width, h: m.height }), big,
+      t(" — конвертирайте го до 1080p"));
+    if (m.video_codec === "hevc") add(t("„{name}“ е H.265, а устройството не го поддържа", { name: m.name }), devices.filter((d) => !d.info!.hevc));
   }
   const total = [...files.values()].reduce((s, m) => s + m.size, 0);
-  add(`Кампанията е ${formatBytes(total)}, а няма толкова свободно място`,
+  add(t("Кампанията е {size}, а няма толкова свободно място", { size: formatBytes(total) }),
     devices.filter((d) => d.info!.free_bytes > 0 && d.info!.free_bytes < total));
   return out;
 }

@@ -1,48 +1,49 @@
 import type { Prep, Quality } from "./api";
+import { t } from "./i18n";
 
 /** The processing choice for uploads: in the hub settings (the default) and
  *  in the media library (for the next uploads). */
 export function PrepFields({ value: p, onChange }: { value: Prep; onChange: (p: Partial<Prep>) => void }) {
   return (
     <>
-      <h4>Снимки</h4>
+      <h4>{t("Снимки")}</h4>
       <div className="grid2">
-        <label>Смаляване на големите снимки
+        <label>{t("Смаляване на големите снимки")}
           <select value={p.image_screen} onChange={(e) => onChange({ image_screen: e.target.value })}>
-            <option value="1920x1080">До хоризонтален Full HD екран (1920×1080)</option>
-            <option value="1080x1920">До вертикален Full HD екран (1080×1920)</option>
-            <option value="3840x2160">До 4K екран (3840×2160)</option>
-            <option value="off">Без смаляване (оригиналът)</option>
+            <option value="1920x1080">{t("До хоризонтален Full HD екран (1920×1080)")}</option>
+            <option value="1080x1920">{t("До вертикален Full HD екран (1080×1920)")}</option>
+            <option value="3840x2160">{t("До 4K екран (3840×2160)")}</option>
+            <option value="off">{t("Без смаляване (оригиналът)")}</option>
           </select>
         </label>
-        <label>Качество (компресия) на смалените снимки
+        <label>{t("Качество (компресия) на смалените снимки")}
           <select value={p.image_quality} onChange={(e) => onChange({ image_quality: e.target.value as Quality })}>
-            <option value="high">Високо (по-голям файл)</option>
-            <option value="normal">Нормално</option>
-            <option value="small">По-малък файл</option>
+            <option value="high">{t("Високо (по-голям файл)")}</option>
+            <option value="normal">{t("Нормално")}</option>
+            <option value="small">{t("По-малък файл")}</option>
           </select>
         </label>
       </div>
-      <h4>Видео</h4>
+      <h4>{t("Видео")}</h4>
       <div className="grid2">
-        <label>Автоматично конвертиране при качване
+        <label>{t("Автоматично конвертиране при качване")}
           <select value={p.video_auto} onChange={(e) => onChange({ video_auto: e.target.value as Prep["video_auto"] })}>
-            <option value="problems">Само когато видеото може да не тръгне</option>
-            <option value="always">Винаги (уеднаквява и смалява файловете)</option>
-            <option value="off">Никога (само с бутона „Конвертирай“)</option>
+            <option value="problems">{t("Само когато видеото може да не тръгне")}</option>
+            <option value="always">{t("Винаги (уеднаквява и смалява файловете)")}</option>
+            <option value="off">{t("Никога (само с бутона „Конвертирай“)")}</option>
           </select>
         </label>
-        <label>Максимална резолюция
+        <label>{t("Максимална резолюция")}
           <select value={p.video_max} onChange={(e) => onChange({ video_max: Number(e.target.value) })}>
             <option value={1080}>Full HD (1080p)</option>
-            <option value={720}>HD (720p) — за много слаби устройства</option>
+            <option value={720}>{t("HD (720p) — за много слаби устройства")}</option>
           </select>
         </label>
-        <label>Качество (компресия)
+        <label>{t("Качество (компресия)")}
           <select value={p.video_quality} onChange={(e) => onChange({ video_quality: e.target.value as Quality })}>
-            <option value="high">Високо (по-голям файл)</option>
-            <option value="normal">Нормално</option>
-            <option value="small">По-малък файл</option>
+            <option value="high">{t("Високо (по-голям файл)")}</option>
+            <option value="normal">{t("Нормално")}</option>
+            <option value="small">{t("По-малък файл")}</option>
           </select>
         </label>
       </div>
@@ -57,8 +58,9 @@ const videoText = { problems: "видео при проблем", always: "ви�
 
 /** One line, e.g. "снимки до 1920×1080 · видео при проблем, 1080p". */
 export function prepSummary(p: Prep): string {
-  const video = videoText[p.video_auto] + (p.video_auto === "off" ? "" : `, ${p.video_max}p`);
-  return `${screenText[p.image_screen] ?? p.image_screen} · ${video}`;
+  const video = t(videoText[p.video_auto]) + (p.video_auto === "off" ? "" : `, ${p.video_max}p`);
+  const screen = screenText[p.image_screen];
+  return `${screen ? t(screen) : p.image_screen} · ${video}`;
 }
 
 export const samePrep = (a: Prep, b: Prep) =>

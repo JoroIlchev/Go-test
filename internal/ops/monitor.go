@@ -2,8 +2,8 @@ package ops
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"marquee/internal/i18n"
 	"slices"
 	"strings"
 	"time"
@@ -90,7 +90,7 @@ func (m *Monitor) Check(ctx context.Context, now time.Time) error {
 	}
 	if !set.MailConfigured() {
 		for _, e := range events {
-			m.logEvent(ctx, e, "имейлът не е настроен")
+			m.logEvent(ctx, e, i18n.T("имейлът не е настроен"))
 		}
 		return nil
 	}
@@ -166,12 +166,12 @@ func (m *Monitor) compose(evs []event) (subject, body string) {
 	for _, e := range evs {
 		name := e.label
 		if name == "" {
-			name = fmt.Sprintf("устройство #%d", e.dev.ID)
+			name = i18n.Tf("устройство #%d", e.dev.ID)
 		}
 		if e.offline {
-			line := "• " + name + " — последно видяно " + m.when(e.dev.LastSeenAt.String)
+			line := "• " + name + " — " + i18n.T("последно видяно") + " " + m.when(e.dev.LastSeenAt.String)
 			if e.dev.NextCheckAt.Valid {
-				line += ", трябваше да провери в " + m.when(e.dev.NextCheckAt.String)
+				line += ", " + i18n.T("трябваше да провери в") + " " + m.when(e.dev.NextCheckAt.String)
 			}
 			off = append(off, line)
 		} else {
@@ -181,23 +181,22 @@ func (m *Monitor) compose(evs []event) (subject, body string) {
 	var b strings.Builder
 	switch {
 	case len(off) > 0 && len(on) > 0:
-		subject = fmt.Sprintf("marquee: %d офлайн, %d отново на линия", len(off), len(on))
+		subject = i18n.Tf("marquee: %d офлайн, %d отново на линия", len(off), len(on))
 	case len(off) == 1:
-		subject = "marquee: устройство е офлайн"
+		subject = i18n.T("marquee: устройство е офлайн")
 	case len(off) > 1:
-		subject = fmt.Sprintf("marquee: %d устройства са офлайн", len(off))
+		subject = i18n.Tf("marquee: %d устройства са офлайн", len(off))
 	case len(on) == 1:
-		subject = "marquee: устройство отново е на линия"
+		subject = i18n.T("marquee: устройство отново е на линия")
 	default:
-		subject = fmt.Sprintf("marquee: %d устройства отново са на линия", len(on))
+		subject = i18n.Tf("marquee: %d устройства отново са на линия", len(on))
 	}
 	if len(off) > 0 {
-		b.WriteString("Не се свързаха навреме:\n" + strings.Join(off, "\n") + "\n\n")
-		b.WriteString("Екранът продължава да показва последното получено съдържание, но няма да получи промени, докато не се свърже. " +
-			"Проверете захранването и интернета на обекта.\n\n")
+		b.WriteString(i18n.T("Не се свързаха навреме:") + "\n" + strings.Join(off, "\n") + "\n\n")
+		b.WriteString(i18n.T("Екранът продължава да показва последното получено съдържание, но няма да получи промени, докато не се свърже. Проверете захранването и интернета на обекта.") + "\n\n")
 	}
 	if len(on) > 0 {
-		b.WriteString("Отново се свързаха:\n" + strings.Join(on, "\n") + "\n\n")
+		b.WriteString(i18n.T("Отново се свързаха:") + "\n" + strings.Join(on, "\n") + "\n\n")
 	}
 	b.WriteString("-- \nmarquee")
 	return subject, b.String()
@@ -206,7 +205,7 @@ func (m *Monitor) compose(evs []event) (subject, body string) {
 func (m *Monitor) when(iso string) string {
 	t, err := time.Parse(time.RFC3339, iso)
 	if err != nil {
-		return "никога"
+		return i18n.T("никога")
 	}
 	return t.In(m.loc).Format("02.01 15:04")
 }

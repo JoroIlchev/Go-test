@@ -147,6 +147,9 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	if auth.Staff(u) {
 		out["hub_url"] = hub
 	}
+	if rel, ok := s.app.Release(); ok && rel.Version != "" {
+		out["player_app"] = rel.Version
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

@@ -1,7 +1,7 @@
 package media
 
 import (
-	"fmt"
+	"marquee/internal/i18n"
 	"strings"
 )
 
@@ -27,7 +27,7 @@ const (
 func CheckVideo(ext string, p *ProbeResult) []Warning {
 	var w []Warning
 	add := func(level, code, format string, args ...any) {
-		w = append(w, Warning{Level: level, Code: code, Message: fmt.Sprintf(format, args...)})
+		w = append(w, Warning{Level: level, Code: code, Message: i18n.Tf(format, args...)})
 	}
 	if ext != "mp4" && ext != "m4v" {
 		add("warn", "container", "Формат %s: за плейърите се препоръчва MP4.", strings.ToUpper(ext))
@@ -67,11 +67,11 @@ func CheckVideo(ext string, p *ProbeResult) []Warning {
 
 func CheckAudio(ext string, p *ProbeResult) []Warning {
 	if p.AudioCodec == "" {
-		return []Warning{{Level: "error", Code: "codec", Message: "Във файла няма аудио поток."}}
+		return []Warning{{Level: "error", Code: "codec", Message: i18n.T("Във файла няма аудио поток.")}}
 	}
 	if p.AudioCodec != "mp3" && p.AudioCodec != "aac" {
 		return []Warning{{Level: "warn", Code: "audio",
-			Message: fmt.Sprintf("Аудио %s: най-сигурни са MP3 и AAC.", strings.ToUpper(p.AudioCodec))}}
+			Message: i18n.Tf("Аудио %s: най-сигурни са MP3 и AAC.", strings.ToUpper(p.AudioCodec))}}
 	}
 	return nil
 }
@@ -80,11 +80,11 @@ func CheckImage(ext string, width, height int) []Warning {
 	var w []Warning
 	if ext == "webp" {
 		w = append(w, Warning{Level: "warn", Code: "format",
-			Message: "WebP не се поддържа сигурно от всички плейъри; по-сигурни са JPG и PNG."})
+			Message: i18n.T("WebP не се поддържа сигурно от всички плейъри; по-сигурни са JPG и PNG.")})
 	}
 	if width*height > maxImagePixels {
 		w = append(w, Warning{Level: "warn", Code: "resolution",
-			Message: fmt.Sprintf("Изображение %d×%d: много голямо, може да се зарежда бавно. Достатъчно е 1920×1080.", width, height)})
+			Message: i18n.Tf("Изображение %d×%d: много голямо, може да се зарежда бавно. Достатъчно е 1920×1080.", width, height)})
 	}
 	return w
 }

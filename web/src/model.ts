@@ -1,9 +1,11 @@
 import type { Device, Kind, Role, TreeNode, User } from "./api";
+import { t } from "./i18n";
 
+// Getters: the label follows the current language.
 export const kindLabel: Record<Kind, string> = {
-  client: "Клиент",
-  group: "Направление",
-  site: "Обект",
+  get client() { return t("Клиент"); },
+  get group() { return t("Направление"); },
+  get site() { return t("Обект"); },
 };
 
 export class TreeIndex {
@@ -89,9 +91,10 @@ export function formatDuration(ms: number): string {
 }
 
 export function roleSummary(r: Role): string {
-  if (r.role === "admin") return "Админ";
-  const perms = [r.can_create && "създава", r.can_edit && "редактира", r.can_publish && "публикува"].filter(Boolean);
-  return `Редактор (${perms.join(", ") || "само преглед"}${r.needs_approval ? ", с одобрение" : ""})`;
+  if (r.role === "admin") return t("Админ");
+  const perms = [r.can_create && t("създава"), r.can_edit && t("редактира"), r.can_publish && t("публикува")].filter(Boolean);
+  const what = (perms.join(", ") || t("само преглед")) + (r.needs_approval ? t(", с одобрение") : "");
+  return t("Редактор ({perms})", { perms: what });
 }
 
 // Players poll at least every few minutes; treat 20 minutes of silence as offline.
@@ -109,10 +112,11 @@ export function deviceState(d: Device, serverTime: string): "online" | "offline"
 }
 
 export function ago(iso: string | null, serverTime: string): string {
-  if (!iso) return "никога";
+  if (!iso) return t("никога");
   const s = Math.max(0, Math.round((Date.parse(serverTime) - Date.parse(iso)) / 1000));
-  if (s < 60) return "току-що";
-  if (s < 3600) return `преди ${Math.round(s / 60)} мин`;
-  if (s < 86400) return `преди ${Math.round(s / 3600)} ч`;
-  return `преди ${Math.round(s / 86400)} дни`;
+  if (s < 60) return t("току-що");
+  if (s < 3600) return t("преди {n} мин", { n: Math.round(s / 60) });
+  if (s < 86400) return t("преди {n} ч", { n: Math.round(s / 3600) });
+  const n = Math.round(s / 86400);
+  return n === 1 ? t("преди 1 ден") : t("преди {n} дни", { n });
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"marquee/internal/i18n"
 	"net/http"
 	"regexp"
 	"strings"
@@ -41,6 +42,7 @@ type manifest struct {
 	Name        string         `json:"name,omitempty"`
 	Site        string         `json:"site,omitempty"`
 	Timezone    string         `json:"timezone"`
+	Lang        string         `json:"lang"` // hub language for the player's own screens
 	Segments    []manifestSeg  `json:"segments"`
 	Files       []manifestFile `json:"files"`
 	App         *manifestApp   `json:"app,omitempty"` // the player version on the hub
@@ -148,10 +150,10 @@ func (h *Handler) sync(w http.ResponseWriter, r *http.Request) {
 
 // manifest builds what the device plays and records which versions it got.
 func (h *Handler) manifest(ctx context.Context, r *http.Request, d *store.Device) (*manifest, error) {
-	m := &manifest{Status: d.Status, Name: d.Name, Timezone: h.cfg.Loc.String(),
+	m := &manifest{Status: d.Status, Name: d.Name, Timezone: h.cfg.Loc.String(), Lang: i18n.Hub(),
 		Segments: []manifestSeg{}, Files: []manifestFile{}}
-	if sha, size := h.app.sum(h.cfg.AppFile); sha != "" {
-		m.App = &manifestApp{URL: requestBase(r, h.cfg.PublicURL) + "/app/" + AppName, SHA256: sha, Size: size}
+	if rel, ok := h.app.Release(); ok {
+		m.App = &manifestApp{URL: requestBase(r, h.cfg.PublicURL) + "/app/" + AppName, SHA256: rel.SHA256, Size: rel.Size}
 	}
 	if d.Status != "active" || !d.NodeID.Valid {
 		m.Status = "pending"
@@ -208,7 +210,7 @@ func (h *Handler) manifest(ctx context.Context, r *http.Request, d *store.Device
 		}
 		what := strings.Join(labels, ", ")
 		if what == "" {
-			what = "няма активни кампании"
+			what = i18n.T("няма активни кампании")
 		}
 		h.log.Info("Устройството получи ново съдържание", "устройство", deviceLabel(d, site), "кампании", what)
 	}

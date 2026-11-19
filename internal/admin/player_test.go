@@ -1,6 +1,7 @@
 package admin_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -187,7 +189,6 @@ func TestAppDownload(t *testing.T) {
 	if resp.Header.Get("Content-Type") != "application/vnd.android.package-archive" || body != "PK fake apk" {
 		t.Fatalf("download: %s %q", resp.Header.Get("Content-Type"), body)
 	}
-
 	// Installed players learn the APK's checksum and update when it changes.
 	type appOffer struct {
 		Version string
@@ -219,4 +220,46 @@ func TestAppDownload(t *testing.T) {
 	if next := sync(); next.App == nil || next.App.SHA256 != sum("PK newer apk") || next.Version == first.Version {
 		t.Fatalf("a new APK not offered: %+v (version %s -> %s)", next.App, first.Version, next.Version)
 	}
+
+	if _, page := get("/app"); strings.Contains(page, "Актуална версия") {
+		t.Fatal("version shown for a file that is no APK")
+	}
+	real, err := os.ReadFile("../apk/testdata/AndroidManifest.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeAPK(t, apk, real)
+	if _, page := get("/app"); !strings.Contains(page, "Актуална версия, която плейърите ще получат: <b>0.1.0</b>") {
+		t.Fatalf("no version on the page:\n%s", page)
+	}
+	// English on request, remembered by a cookie.
+	jar, _ := cookiejar.New(nil)
+	cl := &http.Client{Jar: jar}
+	for _, path := range []string{"/app?lang=en", "/app"} {
+		r, err := cl.Get(ph.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		if !strings.Contains(string(b), "Current version players will receive: <b>0.1.0</b>") || !strings.Contains(string(b), `lang="en"`) {
+			t.Fatalf("%s: not in English:\n%s", path, b)
+		}
+	}
+}
+
+// writeAPK stores a zip holding the given compiled manifest.
+func writeAPK(t *testing.T, path string, manifest []byte) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	w, _ := zw.Create("AndroidManifest.xml")
+	w.Write(manifest)
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
 }

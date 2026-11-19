@@ -1,6 +1,7 @@
 package app.marquee.player
 
 import android.content.Context
+import java.util.Locale
 import java.util.UUID
 
 /** What the player keeps between starts: its id and the hub's address. */
@@ -18,9 +19,16 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_HUB, "") ?: ""
         set(value) = prefs.edit().putString(KEY_HUB, normalizeHub(value)).apply()
 
+    /** Language of the player's screens: the hub's once it told us, before
+     *  that English on an English system and Bulgarian otherwise. */
+    var lang: String
+        get() = prefs.getString(KEY_LANG, null) ?: if (Locale.getDefault().language == "en") "en" else "bg"
+        set(value) = prefs.edit().putString(KEY_LANG, value).apply()
+
     companion object {
         private const val KEY_ID = "device_id"
         private const val KEY_HUB = "hub_url"
+        private const val KEY_LANG = "lang"
 
         /** "192.168.1.5:8080" → "http://192.168.1.5:8080"; no trailing slash. */
         fun normalizeHub(raw: String): String {

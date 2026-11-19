@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText, type Role, type TreeNode, type User } from "./api";
 import { roleSummary, type TreeIndex, isStaff } from "./model";
+import { t } from "./i18n";
 
 interface Props {
   me: User;
@@ -37,9 +38,9 @@ export function UsersSection({ me, idx, node }: Props) {
   return (
     <div className="card">
       <div className="title-row">
-        <h3>Потребители</h3>
+        <h3>{t("Потребители")}</h3>
         <span className="spacer" />
-        {editing === null && <button className="ghost" onClick={() => setEditing("new")}>+ Нов потребител</button>}
+        {editing === null && <button className="ghost" onClick={() => setEditing("new")}>{t("+ Нов потребител")}</button>}
       </div>
       {error && <div className="error">{error}</div>}
       {editing !== null && (
@@ -47,18 +48,18 @@ export function UsersSection({ me, idx, node }: Props) {
           user={editing === "new" ? null : editing}
           onDone={async () => { setEditing(null); await load(); }} />
       )}
-      {here.length === 0 ? <p className="muted">Няма потребители, назначени на това звено.</p> : (
+      {here.length === 0 ? <p className="muted">{t("Няма потребители, назначени на това звено.")}</p> : (
         <table className="table">
-          <thead><tr><th>Име</th><th>Имейл</th><th>Права тук</th><th /></tr></thead>
+          <thead><tr><th>{t("Име")}</th><th>{t("Имейл")}</th><th>{t("Права тук")}</th><th /></tr></thead>
           <tbody>
             {here.map((u) => {
               const r = u.roles.find((x) => x.node_id === node.id)!;
               return (
                 <tr key={u.id} className={u.active ? "" : "inactive"}>
-                  <td>{u.name}{u.id === me.id && <span className="muted"> (вие)</span>}</td>
+                  <td>{u.name}{u.id === me.id && <span className="muted"> {t("(вие)")}</span>}</td>
                   <td>{u.email}</td>
-                  <td>{roleSummary(r)}{!u.active && <span className="pill">спрян</span>}</td>
-                  <td>{u.id !== me.id && <button className="link" onClick={() => setEditing(u)}>Редакция</button>}</td>
+                  <td>{roleSummary(r)}{!u.active && <span className="pill">{t("спрян")}</span>}</td>
+                  <td>{u.id !== me.id && <button className="link" onClick={() => setEditing(u)}>{t("Редакция")}</button>}</td>
                 </tr>
               );
             })}
@@ -67,7 +68,7 @@ export function UsersSection({ me, idx, node }: Props) {
       )}
       {inherited.length > 0 && (
         <p className="muted small">
-          Достъп и от по-горе: {inherited.map((u) => u.name || u.email).join(", ")}
+          {t("Достъп и от по-горе: {names}", { names: inherited.map((u) => u.name || u.email).join(", ") })}
         </p>
       )}
     </div>
@@ -109,37 +110,37 @@ function UserForm({ me, node, user, onDone }: { me: User; node: TreeNode; user: 
 
   return (
     <form className="subcard form" onSubmit={submit}>
-      <h4>{user ? `Редакция: ${user.email}` : `Нов потребител в „${node.name}“`}</h4>
+      <h4>{user ? t("Редакция: {email}", { email: user.email }) : t("Нов потребител в „{node}“", { node: node.name })}</h4>
       <div className="grid2">
-        <label>Имейл<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!!user} /></label>
-        <label>Име<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>{user ? "Нова парола (по желание)" : "Парола"}
+        <label>{t("Имейл")}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!!user} /></label>
+        <label>{t("Име")}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label>{user ? t("Нова парола (по желание)") : t("Парола")}
           <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)}
-            required={!user} minLength={10} placeholder="поне 10 символа" />
+            required={!user} minLength={10} placeholder={t("поне 10 символа")} />
         </label>
       </div>
       <fieldset>
-        <legend>Роля в „{node.name}“ и всичко под него</legend>
+        <legend>{t("Роля в „{node}“ и всичко под него", { node: node.name })}</legend>
         <label className="radio"><input type="radio" checked={role.role === "admin"} onChange={() => set({ role: "admin" })} />
-          Админ: всичко, вкл. потребители и одобрения</label>
+          {t("Админ: всичко, вкл. потребители и одобрения")}</label>
         <label className="radio"><input type="radio" checked={role.role === "editor"} onChange={() => set({ role: "editor" })} />
-          Редактор с права:</label>
+          {t("Редактор с права:")}</label>
         {role.role === "editor" && (
           <div className="perms">
-            <label className="check"><input type="checkbox" checked={role.can_create} onChange={(e) => set({ can_create: e.target.checked })} /> създаване</label>
-            <label className="check"><input type="checkbox" checked={role.can_edit} onChange={(e) => set({ can_edit: e.target.checked })} /> редактиране</label>
-            <label className="check"><input type="checkbox" checked={role.can_publish} onChange={(e) => set({ can_publish: e.target.checked })} /> публикуване</label>
-            <label className="check"><input type="checkbox" checked={role.needs_approval} onChange={(e) => set({ needs_approval: e.target.checked })} /> публикациите изискват одобрение от админ</label>
+            <label className="check"><input type="checkbox" checked={role.can_create} onChange={(e) => set({ can_create: e.target.checked })} /> {t("създаване")}</label>
+            <label className="check"><input type="checkbox" checked={role.can_edit} onChange={(e) => set({ can_edit: e.target.checked })} /> {t("редактиране")}</label>
+            <label className="check"><input type="checkbox" checked={role.can_publish} onChange={(e) => set({ can_publish: e.target.checked })} /> {t("публикуване")}</label>
+            <label className="check"><input type="checkbox" checked={role.needs_approval} onChange={(e) => set({ needs_approval: e.target.checked })} /> {t("публикациите изискват одобрение от админ")}</label>
           </div>
         )}
       </fieldset>
       {user && (
-        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Активен (спирането го изхвърля веднага)</label>
+        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> {t("Активен (спирането го изхвърля веднага)")}</label>
       )}
       {error && <div className="error">{error}</div>}
       <div className="buttons">
-        <button className="primary">{user ? "Запази" : "Създай"}</button>
-        <button type="button" className="ghost" onClick={() => onDone()}>Отказ</button>
+        <button className="primary">{user ? t("Запази") : t("Създай")}</button>
+        <button type="button" className="ghost" onClick={() => onDone()}>{t("Отказ")}</button>
       </div>
     </form>
   );

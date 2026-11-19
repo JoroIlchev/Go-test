@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_hub">no hub</string>
+    <string name="welcome">Welcome</string>
+    <string name="setup">Setup</string>
+    <string name="enter_hub">Enter the hub address</string>
+    <string name="blocked">Blocked</string>
+    <string name="blocked_hint">The device is blocked on the hub</string>
+    <string name="offline">No connection to the hub</string>
+    <string name="offline_hint">Retrying… · hold 3 s for settings</string>
+    <string name="connecting">Connecting…</string>
+    <string name="pairing_code">Pairing code</string>
+    <string name="pairing_hint">Enter the code in marquee → Pending devices</string>
+    <string name="downloading">Downloading content</string>
+    <string name="files_of">%1$d of %2$d</string>
+    <string name="paired">The device is paired</string>
+    <string name="no_name">No name</string>
+    <string name="waiting">Waiting for content</string>
+    <string name="about">Device %1$s · version %2$s</string>
+    <string name="hub_label">Hub address, e.g. 192.168.1.10:8080</string>
+    <string name="settings_title">Marquee Player settings</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+</resources>

@@ -12,6 +12,8 @@ data class Manifest(
     val pairingCode: String,
     val name: String,
     val site: String,
+    /** Language of the player's own screens, chosen on the hub: "bg" or "en" ("" from older hubs). */
+    val lang: String,
     val segments: List<Segment>,
     val files: List<MediaFile>,
     /** The player version on the hub. */
@@ -29,6 +31,7 @@ data class Manifest(
                 pairingCode = o.optString("pairing_code"),
                 name = o.optString("name"),
                 site = o.optString("site"),
+                lang = o.optString("lang"),
                 segments = o.optJSONArray("segments").objects().map { s ->
                     Segment(
                         start = parseTime(s.optString("start")) ?: 0L,

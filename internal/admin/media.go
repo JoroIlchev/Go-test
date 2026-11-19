@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"marquee/internal/i18n"
 	"net/http"
 	"strconv"
 	"strings"
@@ -400,7 +401,7 @@ func (s *Server) renderSlideshow(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		name = "Слайдшоу"
+		name = i18n.T("Слайдшоу")
 	}
 	m, err := s.store.CreateMedia(r.Context(), store.NewMedia{
 		Node: node, Name: name, Kind: "video", Ext: "mp4", Recipe: sh.JSON(), UploadedBy: u.ID,

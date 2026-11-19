@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TreeNode, User } from "./api";
 import { deviceState, isStaff, type TreeIndex } from "./model";
 import type { Selection } from "./App";
+import { t } from "./i18n";
 
 interface Props {
   me: User;
@@ -26,49 +27,49 @@ export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime,
       {isAdminSomewhere && !staff && (
         <div className="tree-actions">
           <button className={"nav-item" + (sel?.type === "approvals" ? " active" : "")} onClick={() => onSelect({ type: "approvals" })}>
-            За одобрение {approvalCount > 0 && <span className="count">{approvalCount}</span>}
+            {t("За одобрение")} {approvalCount > 0 && <span className="count">{approvalCount}</span>}
           </button>
         </div>
       )}
       {staff && (
         <div className="tree-actions">
           <button className={"nav-item" + (sel?.type === "pending" ? " active" : "")} onClick={() => onSelect({ type: "pending" })}>
-            Чакащи устройства {pendingCount > 0 && <span className="count">{pendingCount}</span>}
+            {t("Чакащи устройства")} {pendingCount > 0 && <span className="count">{pendingCount}</span>}
           </button>
           <button className={"nav-item" + (sel?.type === "approvals" ? " active" : "")} onClick={() => onSelect({ type: "approvals" })}>
-            За одобрение {approvalCount > 0 && <span className="count">{approvalCount}</span>}
+            {t("За одобрение")} {approvalCount > 0 && <span className="count">{approvalCount}</span>}
           </button>
           <button className={"nav-item" + (sel?.type === "new-client" ? " active" : "")} onClick={() => onSelect({ type: "new-client" })}>
-            + Нов клиент
+            + {t("Нов клиент")}
           </button>
           {me.is_super && (
             <button className={"nav-item" + (house && sel?.type === "node" && sel.id === house.id ? " active" : "")} onClick={onHouse}>
-              ★ Моята реклама
+              ★ {t("Моята реклама")}
             </button>
           )}
           {(me.is_super || me.can_billing) && (
             <button className={"nav-item" + (sel?.type === "billing" ? " active" : "")} onClick={() => onSelect({ type: "billing" })}>
-              Таксуване
+              {t("Таксуване")}
             </button>
           )}
           {(me.is_super || me.can_logs) && (
             <button className={"nav-item" + (sel?.type === "logs" ? " active" : "")} onClick={() => onSelect({ type: "logs" })}>
-              Логове
+              {t("Логове")}
             </button>
           )}
           {me.is_super && (
             <button className={"nav-item" + (sel?.type === "team" ? " active" : "")} onClick={() => onSelect({ type: "team" })}>
-              Екип
+              {t("Екип")}
             </button>
           )}
           {me.is_super && (
             <button className={"nav-item" + (sel?.type === "settings" ? " active" : "")} onClick={() => onSelect({ type: "settings" })}>
-              Настройки {offline > 0 && <span className="count warn" title="Офлайн устройства">{offline} офлайн</span>}
+              {t("Настройки")} {offline > 0 && <span className="count warn" title={t("Офлайн устройства")}>{t("{n} офлайн", { n: offline })}</span>}
             </button>
           )}
         </div>
       )}
-      {roots.length === 0 && <div className="muted pad">Няма звена.</div>}
+      {roots.length === 0 && <div className="muted pad">{t("Няма звена.")}</div>}
       <ul>
         {roots.map((n) => (
           <Branch key={n.id} node={n} idx={idx} sel={sel} serverTime={serverTime} onSelect={onSelect} />
@@ -90,7 +91,7 @@ function Branch({ node, idx, sel, serverTime, onSelect }: {
   return (
     <li>
       <div className={"row" + (active ? " active" : "")}>
-        <button className="twisty" onClick={() => setOpen(!open)} aria-label={open ? "Свий" : "Разгъни"}
+        <button className="twisty" onClick={() => setOpen(!open)} aria-label={open ? t("Свий") : t("Разгъни")}
           style={{ visibility: hasKids ? "visible" : "hidden" }}>
           {open ? "▾" : "▸"}
         </button>
@@ -109,7 +110,7 @@ function Branch({ node, idx, sel, serverTime, onSelect }: {
                 <span className="twisty" />
                 <button className="label device" onClick={() => onSelect({ type: "device", id: d.id })}>
                   <span className={"dot " + deviceState(d, serverTime)} />
-                  {d.name || "Без име"}
+                  {d.name || t("Без име")}
                 </button>
               </div>
             </li>

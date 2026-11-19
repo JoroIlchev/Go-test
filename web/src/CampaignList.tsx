@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText, importCampaign, type CampaignState, type CampaignSummary, type TreeNode, type User } from "./api";
 import { can, type TreeIndex } from "./model";
 import type { Selection } from "./App";
+import { t } from "./i18n";
 
+// Bulgarian labels; pass them through t() when shown.
 export const stateLabel: Record<CampaignState, string> = {
   draft: "Чернова",
   pending: "Чака одобрение",
@@ -13,7 +15,7 @@ export const stateLabel: Record<CampaignState, string> = {
 };
 
 export function StateBadge({ state }: { state: CampaignState }) {
-  return <span className={"tag st-" + state}>{stateLabel[state]}</span>;
+  return <span className={"tag st-" + state}>{t(stateLabel[state])}</span>;
 }
 
 export function CampaignList({ me, idx, node, onSelect }: {
@@ -62,28 +64,28 @@ export function CampaignList({ me, idx, node, onSelect }: {
     <div className="card">
       {canCreate && (
         <form className="inline-form" onSubmit={create} style={{ marginTop: 0, marginBottom: 12 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Име на нова кампания, напр. Черен петък" required />
-          <button className="primary">+ Нова кампания в „{node.name}“</button>
-          <label className="ghost btn-link file-btn" title="Кампания, свалена с „Изтегли кампанията“, например от хъба на друг компютър">
-            {importing === null ? "Внеси от файл" : `Внасяне… ${Math.round(importing * 100)}%`}
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Име на нова кампания, напр. Черен петък")} required />
+          <button className="primary">+ {t("Нова кампания в „{name}“", { name: node.name })}</button>
+          <label className="ghost btn-link file-btn" title={t("Кампания, свалена с „Изтегли кампанията“, например от хъба на друг компютър")}>
+            {importing === null ? t("Внеси от файл") : t("Внасяне… {p}%", { p: Math.round(importing * 100) })}
             <input type="file" accept=".zip" hidden disabled={importing !== null}
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importFile(f); }} />
           </label>
         </form>
       )}
       {error && <div className="error">{error}</div>}
-      {items.length === 0 ? <p className="muted">Няма кампании.</p> : (
+      {items.length === 0 ? <p className="muted">{t("Няма кампании.")}</p> : (
         <table className="table">
-          <thead><tr><th>Кампания</th><th>Състояние</th><th>Версия на живо</th><th>Звено</th></tr></thead>
+          <thead><tr><th>{t("Кампания")}</th><th>{t("Състояние")}</th><th>{t("Версия на живо")}</th><th>{t("Звено")}</th></tr></thead>
           <tbody>
             {items.map((c) => (
               <tr key={c.id}>
                 <td><button className="link" onClick={() => onSelect({ type: "campaign", id: c.id })}>{c.name}</button></td>
                 <td>
                   <StateBadge state={c.state} />
-                  {c.has_pending && c.state !== "pending" && <span className="tag st-pending" style={{ marginLeft: 6 }}>има чакаща версия</span>}
+                  {c.has_pending && c.state !== "pending" && <span className="tag st-pending" style={{ marginLeft: 6 }}>{t("има чакаща версия")}</span>}
                 </td>
-                <td className="muted">{c.live ? `v${c.live.number}` : "—"}{c.draft_dirty && c.live && " · има промени"}</td>
+                <td className="muted">{c.live ? `v${c.live.number}` : "—"}{c.draft_dirty && c.live && ` · ${t("има промени")}`}</td>
                 <td className="muted">{c.owner_name}</td>
               </tr>
             ))}

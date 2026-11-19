@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, errorText, type BillingRow } from "./api";
+import { t } from "./i18n";
 
 interface Report {
   month: string;
@@ -22,24 +23,25 @@ export function BillingPanel() {
   return (
     <section>
       <div className="title-row">
-        <h2>Таксуване</h2>
+        <h2>{t("Таксуване")}</h2>
         <span className="spacer" />
         <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
-        <a className="button ghost" href={`/api/billing?month=${month}&format=csv`}>Свали за Excel</a>
+        <a className="button ghost" href={`/api/billing?month=${month}&format=csv`}>{t("Свали за Excel")}</a>
       </div>
       {error && <div className="error">{error}</div>}
       <p className="muted small">
-        <strong>Устройство-дни</strong>: за всеки ден, в който устройството е било активно за клиента поне за малко, се брои 1.
-        Чакащо или блокирано устройство не се брои. За текущия месец данните са до днес{r ? ` (${r.days} дни)` : ""}.
+        <strong>{t("Устройство-дни")}</strong>: {t("за всеки ден, в който устройството е било активно за клиента поне за малко, се брои 1.")}{" "}
+        {t("Чакащо или блокирано устройство не се брои.")}{" "}
+        {r ? t("За текущия месец данните са до днес ({days} дни).", { days: r.days }) : t("За текущия месец данните са до днес.")}
       </p>
       {r && (
         <table className="table">
-          <thead><tr><th>Клиент</th><th className="num">Устройство-дни</th><th className="num">Устройства през месеца</th><th className="num">Активни в края</th></tr></thead>
+          <thead><tr><th>{t("Клиент")}</th><th className="num">{t("Устройство-дни")}</th><th className="num">{t("Устройства през месеца")}</th><th className="num">{t("Активни в края")}</th></tr></thead>
           <tbody>
             {r.rows.map((x) => (
               <tr key={x.client_id}><td>{x.name}</td><td className="num">{x.device_days}</td><td className="num">{x.devices}</td><td className="num">{x.active_end}</td></tr>
             ))}
-            <tr className="total"><td>Общо</td><td className="num">{total("device_days")}</td><td className="num">{total("devices")}</td><td className="num">{total("active_end")}</td></tr>
+            <tr className="total"><td>{t("Общо")}</td><td className="num">{total("device_days")}</td><td className="num">{total("devices")}</td><td className="num">{total("active_end")}</td></tr>
           </tbody>
         </table>
       )}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"marquee/internal/i18n"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -100,7 +101,7 @@ func (w *Worker) inspect(ctx context.Context, m *store.Media, prepare bool) erro
 	case "image":
 		wd, ht, err := ImageSize(path)
 		if err != nil {
-			return fmt.Errorf("Файлът не е валидно изображение: %v", err)
+			return fmt.Errorf(i18n.T("Файлът не е валидно изображение: %v"), err)
 		}
 		if upload && !opts.fits(wd, ht) && w.tools.FFmpeg != "" {
 			old := *m
@@ -109,7 +110,7 @@ func (w *Worker) inspect(ctx context.Context, m *store.Media, prepare bool) erro
 				return w.inspectWith(ctx, m)
 			}
 			note := Warning{Level: "info", Code: "resized",
-				Message: fmt.Sprintf("Смалена от %d×%d (%s), за да се побере в екран %d×%d.", wd, ht, formatSize(old.Size), opts.ImageW, opts.ImageH)}
+				Message: i18n.Tf("Смалена от %d×%d (%s), за да се побере в екран %d×%d.", wd, ht, formatSize(old.Size), opts.ImageW, opts.ImageH)}
 			if err := w.inspectWith(ctx, m, note); err != nil {
 				return err
 			}
@@ -125,7 +126,7 @@ func (w *Worker) inspect(ctx context.Context, m *store.Media, prepare bool) erro
 				w.log.Info("Автоматично конвертиране на видео", "видео", m.Name)
 				out, err := w.encode(ctx, path, r.Height > r.Width, opts)
 				if err != nil {
-					return fmt.Errorf("автоматичното конвертиране не успя: %w", err)
+					return fmt.Errorf(i18n.T("автоматичното конвертиране не успя: %w"), err)
 				}
 				defer os.Remove(out)
 				old := *m
@@ -133,7 +134,7 @@ func (w *Worker) inspect(ctx context.Context, m *store.Media, prepare bool) erro
 					return err
 				}
 				note := Warning{Level: "info", Code: "converted",
-					Message: fmt.Sprintf("Конвертирано автоматично за плейърите (оригинал: %s, %s).", strings.ToUpper(old.Ext), formatSize(old.Size))}
+					Message: i18n.Tf("Конвертирано автоматично за плейърите (оригинал: %s, %s).", strings.ToUpper(old.Ext), formatSize(old.Size))}
 				if err := w.inspectWith(ctx, m, note); err != nil {
 					return err
 				}
@@ -215,7 +216,7 @@ func (w *Worker) inspectWith(ctx context.Context, m *store.Media, notes ...Warni
 	case "image":
 		wd, ht, err := ImageSize(path)
 		if err != nil {
-			return fmt.Errorf("Файлът не е валидно изображение: %v", err)
+			return fmt.Errorf(i18n.T("Файлът не е валидно изображение: %v"), err)
 		}
 		p.Width, p.Height = wd, ht
 		warnings = CheckImage(m.Ext, wd, ht)
@@ -225,10 +226,10 @@ func (w *Worker) inspectWith(ctx context.Context, m *store.Media, notes ...Warni
 		if err != nil {
 			if w.tools.FFprobe == "" {
 				warnings = append(warnings, Warning{Level: "warn", Code: "noffmpeg",
-					Message: "ffmpeg не е наличен на сървъра: файлът не е проверен за съвместимост."})
+					Message: i18n.T("ffmpeg не е наличен на сървъра: файлът не е проверен за съвместимост.")})
 				break
 			}
-			return fmt.Errorf("Файлът не може да се прочете: %v", err)
+			return fmt.Errorf(i18n.T("Файлът не може да се прочете: %v"), err)
 		}
 		p.Width, p.Height, p.DurationMS = r.Width, r.Height, r.DurationMS
 		p.VideoCodec, p.AudioCodec, p.FPS, p.Bitrate = r.VideoCodec, r.AudioCodec, r.FPS, r.Bitrate
@@ -264,16 +265,16 @@ func (w *Worker) thumb(sha string, create func(dst string) error) bool {
 // format every Android 7 player handles, then inspects the result.
 func (w *Worker) convert(ctx context.Context, m *store.Media) error {
 	if w.tools.FFmpeg == "" {
-		return fmt.Errorf("ffmpeg не е наличен на сървъра")
+		return errors.New(i18n.T("ffmpeg не е наличен на сървъра"))
 	}
 	src, err := w.store.Media(ctx, m.SourceID.Int64)
 	if err != nil {
-		return fmt.Errorf("изходният файл липсва: %w", err)
+		return fmt.Errorf(i18n.T("изходният файл липсва: %w"), err)
 	}
 	w.log.Info("Конвертиране на видео", "видео", src.Name, "резултат", m.Name)
 	out, err := w.encode(ctx, w.storage.Path(src.SHA256, src.Ext), src.Height > src.Width, w.optionsFor(ctx, src))
 	if err != nil {
-		return fmt.Errorf("конвертирането не успя: %w", err)
+		return fmt.Errorf(i18n.T("конвертирането не успя: %w"), err)
 	}
 	defer os.Remove(out)
 	return w.adopt(ctx, m, out)
@@ -298,19 +299,19 @@ func (w *Worker) encode(ctx context.Context, in string, portrait bool, opts Opti
 // render turns the item's slideshow recipe into an MP4.
 func (w *Worker) render(ctx context.Context, m *store.Media) error {
 	if w.tools.FFmpeg == "" {
-		return fmt.Errorf("ffmpeg не е наличен на сървъра")
+		return errors.New(i18n.T("ffmpeg не е наличен на сървъра"))
 	}
 	sh, err := ParseSlideshow(m.Recipe)
 	if err == nil {
 		err = sh.Normalize()
 	}
 	if err != nil {
-		return fmt.Errorf("невалидна рецепта: %v", err)
+		return fmt.Errorf(i18n.T("невалидна рецепта: %v"), err)
 	}
 	file := func(id int64, kind string) (string, error) {
 		src, err := w.store.Media(ctx, id)
 		if err != nil || src.Kind != kind || src.Status != "ready" {
-			return "", fmt.Errorf("файл #%d липсва или още не е готов", id)
+			return "", fmt.Errorf(i18n.T("файл #%d липсва или още не е готов"), id)
 		}
 		// ffmpeg runs in the job directory, so relative paths would break.
 		return filepath.Abs(w.storage.Path(src.SHA256, src.Ext))
@@ -353,14 +354,14 @@ func (w *Worker) render(ctx context.Context, m *store.Media) error {
 	cmd := command(ctx, w.tools.FFmpeg, job.Args...)
 	cmd.Dir = dir
 	if err := run(cmd); err != nil {
-		return fmt.Errorf("видеото не можа да се направи: %w", err)
+		return fmt.Errorf(i18n.T("видеото не можа да се направи: %w"), err)
 	}
 	if n := sh.Loops(); n > 0 {
 		// Repeat by copying the encoded stream: no quality loss, takes seconds.
 		looped := filepath.Join(dir, "looped.mp4")
 		if err := w.ffmpeg(ctx, []string{"-v", "error", "-y", "-stream_loop", strconv.Itoa(n), "-i", out,
 			"-map", "0", "-c", "copy", "-movflags", "+faststart", looped}); err != nil {
-			return fmt.Errorf("повторението на видеото не успя: %w", err)
+			return fmt.Errorf(i18n.T("повторението на видеото не успя: %w"), err)
 		}
 		out = looped
 	}
@@ -409,7 +410,7 @@ func FindFont(file string) (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("шрифтът %s не е намерен (сложете го в tools\\fonts)", file)
+	return "", fmt.Errorf(i18n.T("шрифтът %s не е намерен (сложете го в tools\\fonts)"), file)
 }
 
 func copyFile(src, dst string) error {

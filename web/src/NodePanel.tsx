@@ -6,6 +6,7 @@ import { UsersSection } from "./UsersSection";
 import { MediaLibrary } from "./MediaLibrary";
 import { CampaignList } from "./CampaignList";
 import { PollCard } from "./PollCard";
+import { t } from "./i18n";
 
 interface Props {
   me: User;
@@ -28,15 +29,13 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
   if (node.house) {
     return (
       <section>
-        <div className="title-row"><h2>★ Моята реклама</h2></div>
+        <div className="title-row"><h2>★ {t("Моята реклама")}</h2></div>
         <p className="muted">
-          Вашите реклами, които се въртят на екраните на клиентите: всяка кампания тук се пуска определен брой пъти на ден,
-          разпределени равномерно в часовете, в които екранът показва съдържание. Клиентите не виждат този раздел
-          и не могат да променят рекламите.
+          {t("Вашите реклами, които се въртят на екраните на клиентите: всяка кампания тук се пуска определен брой пъти на ден, разпределени равномерно в часовете, в които екранът показва съдържание. Клиентите не виждат този раздел и не могат да променят рекламите.")}
         </p>
         <div className="tabs">
-          <button className={tab === "campaigns" ? "on" : ""} onClick={() => setTab("campaigns")}>Кампании</button>
-          <button className={tab === "media" ? "on" : ""} onClick={() => setTab("media")}>Медия</button>
+          <button className={tab === "campaigns" ? "on" : ""} onClick={() => setTab("campaigns")}>{t("Кампании")}</button>
+          <button className={tab === "media" ? "on" : ""} onClick={() => setTab("media")}>{t("Медия")}</button>
         </div>
         {tab === "campaigns" && <CampaignList me={me} idx={idx} node={node} onSelect={onSelect} />}
         {tab === "media" && <MediaLibrary me={me} idx={idx} node={node} />}
@@ -45,7 +44,7 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
   }
 
   async function rename() {
-    const name = prompt("Ново име", node.name);
+    const name = prompt(t("Ново име"), node.name);
     if (!name || name === node.name) return;
     try {
       await api("PATCH", `/api/nodes/${node.id}`, { name });
@@ -56,7 +55,7 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
   }
 
   async function remove() {
-    if (!confirm(`Да изтрия ли „${node.name}“?`)) return;
+    if (!confirm(t("Да изтрия ли „{name}“?", { name: node.name }))) return;
     try {
       await api("DELETE", `/api/nodes/${node.id}`);
       await onChange();
@@ -73,15 +72,15 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
         <h2>{node.name}</h2>
         <span className={"pill kind-" + node.kind}>{kindLabel[node.kind]}</span>
         <span className="spacer" />
-        {admin && <button className="ghost" onClick={rename}>Преименувай</button>}
-        {canDelete && <button className="ghost danger" onClick={remove}>Изтрий</button>}
+        {admin && <button className="ghost" onClick={rename}>{t("Преименувай")}</button>}
+        {canDelete && <button className="ghost danger" onClick={remove}>{t("Изтрий")}</button>}
       </div>
       {error && <div className="error">{error}</div>}
 
       <div className="tabs">
-        <button className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>Общ преглед</button>
-        <button className={tab === "campaigns" ? "on" : ""} onClick={() => setTab("campaigns")}>Кампании</button>
-        <button className={tab === "media" ? "on" : ""} onClick={() => setTab("media")}>Медия</button>
+        <button className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>{t("Общ преглед")}</button>
+        <button className={tab === "campaigns" ? "on" : ""} onClick={() => setTab("campaigns")}>{t("Кампании")}</button>
+        <button className={tab === "media" ? "on" : ""} onClick={() => setTab("media")}>{t("Медия")}</button>
       </div>
 
       {tab === "campaigns" && <CampaignList me={me} idx={idx} node={node} onSelect={onSelect} />}
@@ -89,14 +88,14 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
       {tab === "overview" && <>
       {node.kind !== "site" && (
         <div className="card">
-          <h3>Подзвена</h3>
-          {children.length === 0 ? <p className="muted">Няма подзвена.</p> : (
+          <h3>{t("Подзвена")}</h3>
+          {children.length === 0 ? <p className="muted">{t("Няма подзвена.")}</p> : (
             <ul className="list">
               {children.map((c) => (
                 <li key={c.id}>
                   <button className="link" onClick={() => onSelect({ type: "node", id: c.id })}>{c.name}</button>
                   <span className={"pill kind-" + c.kind}>{kindLabel[c.kind]}</span>
-                  <span className="muted">{idx.devicesUnder(c).length} устр.</span>
+                  <span className="muted">{t("{n} устр.", { n: idx.devicesUnder(c).length })}</span>
                 </li>
               ))}
             </ul>
@@ -106,7 +105,7 @@ export function NodePanel({ me, idx, node, serverTime, onChange, onSelect }: Pro
       )}
 
       <div className="card">
-        <h3>Устройства {devices.length > 0 && <span className="muted">({devices.length})</span>}</h3>
+        <h3>{t("Устройства")} {devices.length > 0 && <span className="muted">({devices.length})</span>}</h3>
         <DeviceTable devices={devices} idx={idx} showSite={node.kind !== "site"} serverTime={serverTime} onSelect={onSelect} />
         {isStaff(me) && node.kind === "site" && <AddLinkDevice site={node} onChange={onChange} onSelect={onSelect} />}
       </div>
@@ -133,16 +132,22 @@ export function Breadcrumb({ idx, node, onSelect }: { idx: TreeIndex; node: Tree
   );
 }
 
-const stateLabel = { online: "онлайн", offline: "офлайн", pending: "чака", blocked: "блокирано", never: "не се е свързвало" };
+const stateLabel = {
+  get online() { return t("онлайн"); },
+  get offline() { return t("офлайн"); },
+  get pending() { return t("чака"); },
+  get blocked() { return t("блокирано"); },
+  get never() { return t("не се е свързвало"); },
+};
 
 export function DeviceTable({ devices, idx, showSite, serverTime, onSelect }: {
   devices: Device[]; idx: TreeIndex; showSite: boolean; serverTime: string; onSelect: (s: Selection) => void;
 }) {
-  if (devices.length === 0) return <p className="muted">Няма устройства.</p>;
+  if (devices.length === 0) return <p className="muted">{t("Няма устройства.")}</p>;
   return (
     <table className="table">
       <thead>
-        <tr><th>Устройство</th>{showSite && <th>Обект</th>}<th>Състояние</th><th>Последно</th></tr>
+        <tr><th>{t("Устройство")}</th>{showSite && <th>{t("Обект")}</th>}<th>{t("Състояние")}</th><th>{t("Последно")}</th></tr>
       </thead>
       <tbody>
         {devices.map((d) => {
@@ -150,7 +155,7 @@ export function DeviceTable({ devices, idx, showSite, serverTime, onSelect }: {
           const site = d.node_id !== null ? idx.byId.get(d.node_id) : undefined;
           return (
             <tr key={d.id}>
-              <td><button className="link" onClick={() => onSelect({ type: "device", id: d.id })}>{d.name || "Без име"}</button></td>
+              <td><button className="link" onClick={() => onSelect({ type: "device", id: d.id })}>{d.name || t("Без име")}</button></td>
               {showSite && <td>{site?.name}</td>}
               <td><span className={"dot " + st} /> {stateLabel[st]}</td>
               <td className="muted">{ago(d.last_seen_at, serverTime)}</td>
@@ -183,11 +188,11 @@ function AddChild({ parent, onChange, onSelect }: { parent: TreeNode; onChange: 
   return (
     <form className="inline-form" onSubmit={submit}>
       <select value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-        <option value="group">Направление</option>
-        <option value="site">Обект</option>
+        <option value="group">{t("Направление")}</option>
+        <option value="site">{t("Обект")}</option>
       </select>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "site" ? "Кафе Център" : "Кафета"} required />
-      <button className="primary">Добави</button>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "site" ? t("Кафе Център") : t("Кафета")} required />
+      <button className="primary">{t("Добави")}</button>
       {error && <span className="error">{error}</span>}
     </form>
   );
@@ -211,10 +216,10 @@ function AddLinkDevice({ site, onChange, onSelect }: { site: TreeNode; onChange:
 
   return (
     <form className="inline-form" onSubmit={submit}>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Име на екрана" required />
-      <button className="ghost">+ Устройство с личен линк</button>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Име на екрана")} required />
+      <button className="ghost">+ {t("Устройство с личен линк")}</button>
       {error && <span className="error">{error}</span>}
-      <span className="muted small">Самостоятелно регистриралите се устройства се свързват от „Чакащи устройства“.</span>
+      <span className="muted small">{t("Самостоятелно регистриралите се устройства се свързват от „Чакащи устройства“.")}</span>
     </form>
   );
 }

@@ -42,13 +42,16 @@ type Settings struct {
 	VideoAuto    string `json:"video_auto"`    // off | problems | always
 	VideoMax     int    `json:"video_max"`     // 1080 | 720
 	VideoQuality string `json:"video_quality"` // high | normal | small
+
+	// Lang is the language of logs, e-mails, exports and player screens: "bg" or "en".
+	Lang string `json:"lang"`
 }
 
 const settingsKey = "hub"
 
 func Defaults() Settings {
 	return Settings{SMTPPort: 587, AlertGraceMin: 10, BackupTime: "03:00", BackupKeep: 14, AlertEmails: []string{},
-		ImageScreen: "1920x1080", ImageQuality: "normal", VideoAuto: "problems", VideoMax: 1080, VideoQuality: "normal"}
+		ImageScreen: "1920x1080", ImageQuality: "normal", VideoAuto: "problems", VideoMax: 1080, VideoQuality: "normal", Lang: "bg"}
 }
 
 func Load(ctx context.Context, st *store.Store) (Settings, error) {
@@ -76,6 +79,9 @@ func Save(ctx context.Context, st *store.Store, s Settings) error {
 // needs to see the stored password.
 func (s *Settings) Normalize(prev Settings) error {
 	s.SMTPHost = strings.TrimSpace(s.SMTPHost)
+	if s.Lang != "en" {
+		s.Lang = "bg"
+	}
 	s.SMTPFrom = strings.TrimSpace(s.SMTPFrom)
 	if s.SMTPPass == "" {
 		s.SMTPPass = prev.SMTPPass

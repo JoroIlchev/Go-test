@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Logo } from "./Logo";
+import { LangSwitch } from "./LangSwitch";
+import { t } from "./i18n";
 import { api, errorText, type User } from "./api";
 
 export function Login({ onLogin }: { onLogin: (u: User) => void }) {
@@ -26,15 +28,16 @@ export function Login({ onLogin }: { onLogin: (u: User) => void }) {
       <form className="card login" onSubmit={submit}>
         <h1 className="brand"><Logo size={40} /></h1>
         <label>
-          Имейл
+          {t("Имейл")}
           <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
         </label>
         <label>
-          Парола
+          {t("Парола")}
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
         {error && <div className="error">{error}</div>}
-        <button className="primary" disabled={busy}>Вход</button>
+        <button className="primary" disabled={busy}>{t("Вход")}</button>
+        <div className="login-lang"><LangSwitch /></div>
       </form>
     </div>
   );

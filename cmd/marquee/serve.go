@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"marquee/internal/admin"
+	"marquee/internal/i18n"
 	"marquee/internal/logx"
 	"marquee/internal/media"
 	"marquee/internal/ops"
@@ -104,6 +105,9 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 		return err
 	}
 	defer st.Close()
+	if set, err := ops.Load(ctx, st); err == nil {
+		i18n.SetHub(set.Lang)
+	}
 	if n, err := st.CountUsers(ctx); err == nil && n == 0 {
 		log.Warn("Още няма потребители: създайте първия с marquee.exe create-super -email vie@firma.bg")
 	}
@@ -115,7 +119,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 	tools := media.FindTools(c.toolsDir)
 	if tools.FFmpeg == "" || tools.FFprobe == "" {
 		log.Warn("Няма ffmpeg: видеата се качват, но не се проверяват и конвертират",
-			"решение", `сложете ffmpeg.exe и ffprobe.exe в папка tools до marquee.exe`)
+			"решение", i18n.T(`сложете ffmpeg.exe и ffprobe.exe в папка tools до marquee.exe`))
 	} else {
 		log.Info("ffmpeg е наличен", "път", tools.FFmpeg)
 	}
@@ -143,6 +147,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 		PublicURL: c.publicURL, PlayerScheme: scheme, PlayerPort: port, Logs: logs,
 		Web: web.Dist(), Storage: storage, Worker: worker,
 		MaxUpload: c.maxUploadMB << 20, Loc: loc, DefaultPoll: poll.Interval(c.refresh), Backup: backup,
+		AppFile: appFile(),
 	}
 
 	type server struct {
@@ -187,7 +192,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 	g.Go(func() error { backup.Run(gctx); return nil })
 	for _, srv := range servers {
 		g.Go(func() error {
-			log.Info("Слуша за "+srv.purpose, "адрес", srv.Addr)
+			log.Info(i18n.T("Слуша за")+" "+i18n.T(srv.purpose), "адрес", srv.Addr)
 			var err error
 			if srv.TLSConfig != nil {
 				err = srv.ListenAndServeTLS("", "")
@@ -212,7 +217,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 	log.Info("marquee е стартиран", "данни", c.dataDir)
 	hub := adminSrv.HubURL(ctx)
 	if ops.IsPrivate(hub) {
-		log.Warn("Адрес за устройствата е вътрешен", "адрес", hub, "решение", "публичният IP се задава в Настройки")
+		log.Warn("Адрес за устройствата е вътрешен", "адрес", hub, "решение", i18n.T("публичният IP се задава в Настройки"))
 	} else {
 		log.Info("Адрес за устройствата", "адрес", hub)
 	}

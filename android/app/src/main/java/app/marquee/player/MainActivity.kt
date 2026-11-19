@@ -2,6 +2,8 @@ package app.marquee.player
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +16,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.util.Locale
 
 /** The whole player: the stage plays content, the status screen covers it
  *  whenever there is nothing to play. Holding a click (or a finger) for
@@ -34,11 +37,14 @@ class MainActivity : Activity(), Syncer.Listener {
     private val main = Handler(Looper.getMainLooper())
     private val openSettings = Runnable { showSettings() }
     private var dialog: AlertDialog? = null
+    /** Texts in the language the hub chose, whatever the system's is. */
+    private lateinit var texts: Resources
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         settings = Settings(this)
+        useLang(settings.lang)
         status = StatusView(this)
         root = FrameLayout(this)
         setContentView(root)
@@ -49,9 +55,9 @@ class MainActivity : Activity(), Syncer.Listener {
     private fun start() {
         stop()
         val url = settings.hubUrl
-        status.footer("Marquee Player ${BuildConfig.VERSION_NAME} · ${url.ifEmpty { "без хъб" }}")
+        footer()
         if (url.isEmpty()) {
-            status.show("Добре дошли", "Настройка", "Въведете адреса на хъба", 0.09f)
+            status.show(tr(R.string.welcome), tr(R.string.setup), tr(R.string.enter_hub), 0.09f)
             main.post { showSettings() }
             return
         }
@@ -83,7 +89,24 @@ class MainActivity : Activity(), Syncer.Listener {
         super.onDestroy()
     }
 
+    private fun useLang(lang: String) {
+        val conf = Configuration(resources.configuration)
+        conf.setLocale(Locale(lang))
+        texts = createConfigurationContext(conf).resources
+    }
+
+    private fun tr(id: Int, vararg args: Any): String = texts.getString(id, *args)
+
+    private fun footer() {
+        status.footer("Marquee Player ${BuildConfig.VERSION_NAME} · ${settings.hubUrl.ifEmpty { tr(R.string.no_hub) }}")
+    }
+
     override fun onManifest(m: Manifest) {
+        if (m.lang.isNotEmpty() && m.lang != settings.lang) {
+            settings.lang = m.lang
+            useLang(m.lang)
+            footer()
+        }
         manifest = m
         stage?.show(m)
         render()
@@ -106,17 +129,17 @@ class MainActivity : Activity(), Syncer.Listener {
         status.visibility = if (playing && connection != Syncer.Connection.BLOCKED) View.GONE else View.VISIBLE
         when {
             connection == Syncer.Connection.BLOCKED ->
-                status.show("", "Блокирано", "Устройството е блокирано в хъба", 0.09f)
+                status.show("", tr(R.string.blocked), tr(R.string.blocked_hint), 0.09f)
             m == null && connection == Syncer.Connection.OFFLINE ->
-                status.show("Няма връзка с хъба", settings.hubUrl.removePrefix("http://"), "Опитва отново… · задръжте 3 сек. за настройки", 0.07f)
-            m == null -> status.show("", "Свързване…", "", 0.09f)
+                status.show(tr(R.string.offline), settings.hubUrl.removePrefix("http://"), tr(R.string.offline_hint), 0.07f)
+            m == null -> status.show("", tr(R.string.connecting), "", 0.09f)
             m.status == "pending" ->
-                status.show("Код за свързване", m.pairingCode, "Въведете кода в marquee → Чакащи устройства")
+                status.show(tr(R.string.pairing_code), m.pairingCode, tr(R.string.pairing_hint))
             files.second > 0 && files.first < files.second && m.segmentAt(hub?.now() ?: 0L) != null ->
-                status.show("Сваляне на съдържанието", "${files.first} от ${files.second}", m.name, 0.12f)
+                status.show(tr(R.string.downloading), tr(R.string.files_of, files.first, files.second), m.name, 0.12f)
             else ->
-                status.show("Устройството е свързано", m.name.ifEmpty { "Без име" },
-                    listOf(m.site, "Очаква съдържание").filter { it.isNotEmpty() }.joinToString(" · "), 0.08f)
+                status.show(tr(R.string.paired), m.name.ifEmpty { tr(R.string.no_name) },
+                    listOf(m.site, tr(R.string.waiting)).filter { it.isNotEmpty() }.joinToString(" · "), 0.08f)
         }
     }
 
@@ -152,21 +175,21 @@ class MainActivity : Activity(), Syncer.Listener {
             setSingleLine()
         }
         val about = TextView(this).apply {
-            text = "Устройство ${settings.deviceId.take(8)} · версия ${BuildConfig.VERSION_NAME}"
+            text = tr(R.string.about, settings.deviceId.take(8), BuildConfig.VERSION_NAME)
             alpha = 0.7f
             setPadding(0, pad / 2, 0, 0)
         }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad / 2, pad, 0)
-            addView(TextView(this@MainActivity).apply { text = "Адрес на хъба, например 192.168.1.10:8080" })
+            addView(TextView(this@MainActivity).apply { text = tr(R.string.hub_label) })
             addView(input)
             addView(about)
         }
         dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Настройки на Marquee Player")
+            .setTitle(tr(R.string.settings_title))
             .setView(box)
-            .setPositiveButton("Запази") { _, _ ->
+            .setPositiveButton(tr(R.string.save)) { _, _ ->
                 val changed = Settings.normalizeHub(input.text.toString()) != settings.hubUrl
                 settings.hubUrl = input.text.toString()
                 if (changed) {
@@ -175,7 +198,7 @@ class MainActivity : Activity(), Syncer.Listener {
                     start()
                 }
             }
-            .setNegativeButton("Отказ", null)
+            .setNegativeButton(tr(R.string.cancel), null)
             .show()
     }
 

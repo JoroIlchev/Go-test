@@ -23,6 +23,7 @@ type User struct {
 	ClientID   sql.NullInt64 `json:"-"`
 	ClientRef  *int64        `json:"client_id"`
 	Active     bool          `json:"active"`
+	Lang       string        `json:"lang"` // admin language: "bg" or "en"
 	CreatedAt  string        `json:"created_at"`
 	Roles      []Role        `json:"roles"`
 }
@@ -37,12 +38,12 @@ type Role struct {
 }
 
 const userCols = `id, email, name, pass_hash, is_super, is_manager, all_clients, can_billing, can_logs,
-	client_id, active, created_at`
+	client_id, active, created_at, lang`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PassHash, &u.IsSuper, &u.IsManager, &u.AllClients,
-		&u.CanBilling, &u.CanLogs, &u.ClientID, &u.Active, &u.CreatedAt)
+		&u.CanBilling, &u.CanLogs, &u.ClientID, &u.Active, &u.CreatedAt, &u.Lang)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -376,4 +377,10 @@ func (s *Store) Audit(ctx context.Context, userID int64, action string, nodeID i
 		`INSERT INTO audit_log (user_id, action, node_id, details) VALUES (?, ?, ?, ?)`,
 		userID, action, node, details)
 	s.notify()
+}
+
+// SetUserLang stores the admin language the user picked.
+func (s *Store) SetUserLang(ctx context.Context, id int64, lang string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET lang = ? WHERE id = ?`, lang, id)
+	return err
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"marquee/internal/i18n"
 	"mime"
 	"net/http"
 	"os"
@@ -223,7 +224,7 @@ func (s *Server) importCampaign(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.audit(r, "campaign.import", n.ID, c.Name+" ("+strconv.Itoa(len(tf.Media))+" файла)")
+	s.audit(r, "campaign.import", n.ID, c.Name+" ("+strconv.Itoa(len(tf.Media))+" "+i18n.T("файла")+")")
 	writeJSON(w, http.StatusCreated, map[string]int64{"id": c.ID})
 }
 

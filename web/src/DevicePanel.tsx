@@ -3,17 +3,19 @@ import { api, errorText, type Device, type DeviceInfo, type User } from "./api";
 import { ago, deviceState, formatBytes, type TreeIndex, isStaff } from "./model";
 import type { Selection } from "./App";
 import { Breadcrumb } from "./NodePanel";
+import { locale, t } from "./i18n";
 
 interface Props {
   me: User;
   idx: TreeIndex;
   device: Device;
   serverTime: string;
+  playerApp?: string;
   onChange: () => Promise<void>;
   onSelect: (s: Selection) => void;
 }
 
-export function DevicePanel({ me, idx, device: d, serverTime, onChange, onSelect }: Props) {
+export function DevicePanel({ me, idx, device: d, serverTime, playerApp, onChange, onSelect }: Props) {
   const site = d.node_id !== null ? idx.byId.get(d.node_id) : undefined;
   const st = deviceState(d, serverTime);
 
@@ -26,47 +28,51 @@ export function DevicePanel({ me, idx, device: d, serverTime, onChange, onSelect
         </div>
       )}
       <div className="title-row">
-        <h2>{d.name || "Без име"}</h2>
+        <h2>{d.name || t("Без име")}</h2>
         <span className={"pill state-" + st}><span className={"dot " + st} /> {ago(d.last_seen_at, serverTime)}</span>
       </div>
 
       <div className="card">
-        <h3>Информация</h3>
+        <h3>{t("Информация")}</h3>
         <dl className="facts">
-          <dt>Последна връзка</dt><dd>{d.last_seen_at ? new Date(d.last_seen_at).toLocaleString("bg-BG") : "никога"}</dd>
-          {d.offline_since && <><dt>Офлайн</dt><dd className="error-text">не провери в {new Date(d.offline_since).toLocaleString("bg-BG")}</dd></>}
-          {d.next_check_at && !d.offline_since && <><dt>Следваща проверка</dt><dd>{new Date(d.next_check_at).toLocaleString("bg-BG")}</dd></>}
+          <dt>{t("Последна връзка")}</dt><dd>{d.last_seen_at ? new Date(d.last_seen_at).toLocaleString(locale()) : t("никога")}</dd>
+          {d.offline_since && <><dt>{t("Офлайн")}</dt><dd className="error-text">{t("не провери в {time}", { time: new Date(d.offline_since).toLocaleString(locale()) })}</dd></>}
+          {d.next_check_at && !d.offline_since && <><dt>{t("Следваща проверка")}</dt><dd>{new Date(d.next_check_at).toLocaleString(locale())}</dd></>}
           <dt>IP</dt><dd>{d.last_ip || "—"}</dd>
-          <dt>Плейър</dt><dd className="mono small">{d.user_agent || "—"}</dd>
-          <dt>Добавено</dt><dd>{new Date(d.created_at).toLocaleString("bg-BG")}</dd>
+          <dt>{t("Плейър")}</dt><dd className="mono small">{d.user_agent || "—"}</dd>
+          <dt>{t("Добавено")}</dt><dd>{new Date(d.created_at).toLocaleString(locale())}</dd>
         </dl>
       </div>
 
-      {d.info && <Hardware info={d.info} />}
+      {d.info && <Hardware info={d.info} playerApp={playerApp} />}
 
       {isStaff(me) ? <DeviceSettings d={d} idx={idx} onChange={onChange} /> : (
-        <p className="muted">Настройките на устройството се управляват от оператора на системата.</p>
+        <p className="muted">{t("Настройките на устройството се управляват от оператора на системата.")}</p>
       )}
     </section>
   );
 }
 
-function Hardware({ info: i }: { info: DeviceInfo }) {
+function Hardware({ info: i, playerApp }: { info: DeviceInfo; playerApp?: string }) {
+  const behind = !!playerApp && !!i.app && i.app !== playerApp;
   const days = Math.floor(i.uptime_s / 86400);
   const hours = Math.floor((i.uptime_s % 86400) / 3600);
   return (
     <div className="card">
-      <h3>Устройство</h3>
+      <h3>{t("Устройство")}</h3>
       <dl className="facts">
-        <dt>Модел</dt><dd>{[i.manufacturer, i.model].filter(Boolean).join(" ") || "—"}</dd>
+        <dt>{t("Модел")}</dt><dd>{[i.manufacturer, i.model].filter(Boolean).join(" ") || "—"}</dd>
         <dt>Android</dt><dd>{i.android || "—"}</dd>
-        <dt>Екран</dt><dd>{i.screen_w && i.screen_h ? `${i.screen_w}×${i.screen_h}, ${i.screen_w >= i.screen_h ? "хоризонтален" : "вертикален"}` : "—"}</dd>
-        <dt>Видео до</dt><dd>{i.video_max_w ? `${i.video_max_w}×${i.video_max_h}${i.hevc ? ", и H.265" : ", само H.264"}` : "—"}</dd>
-        <dt>Свободно място</dt><dd>{i.total_bytes ? `${formatBytes(i.free_bytes)} от ${formatBytes(i.total_bytes)}` : "—"}</dd>
-        <dt>Локален IP</dt><dd>{i.local_ip || "—"}</dd>
-        <dt>Работи от</dt><dd>{i.uptime_s ? (days ? `${days} дни ${hours} ч` : `${hours} ч`) : "—"}</dd>
-        <dt>Плейър</dt><dd>Marquee Player {i.app}</dd>
-        <dt>Обновяване</dt><dd>{i.owner ? "Автоматично, без потвърждение" : "Автоматично, с потвърждение на екрана"}</dd>
+        <dt>{t("Екран")}</dt><dd>{i.screen_w && i.screen_h ? `${i.screen_w}×${i.screen_h}, ${i.screen_w >= i.screen_h ? t("хоризонтален") : t("вертикален")}` : "—"}</dd>
+        <dt>{t("Видео до")}</dt><dd>{i.video_max_w ? `${i.video_max_w}×${i.video_max_h}${i.hevc ? t(", и H.265") : t(", само H.264")}` : "—"}</dd>
+        <dt>{t("Свободно място")}</dt><dd>{i.total_bytes ? t("{free} от {total}", { free: formatBytes(i.free_bytes), total: formatBytes(i.total_bytes) }) : "—"}</dd>
+        <dt>{t("Локален IP")}</dt><dd>{i.local_ip || "—"}</dd>
+        <dt>{t("Работи от")}</dt><dd>{i.uptime_s ? (days ? t("{days} дни {hours} ч", { days, hours }) : t("{hours} ч", { hours })) : "—"}</dd>
+        <dt>{t("Плейър")}</dt><dd>Marquee Player {i.app}
+          {playerApp && (behind
+            ? <> <span className="tag warn">{t("на хъба е {version}, ще се обнови", { version: playerApp })}</span></>
+            : <span className="muted"> · {t("актуална")}</span>)}</dd>
+        <dt>{t("Обновяване")}</dt><dd>{i.owner ? t("Автоматично, без потвърждение") : t("Автоматично, с потвърждение на екрана")}</dd>
       </dl>
     </div>
   );
@@ -96,67 +102,67 @@ function DeviceSettings({ d, idx, onChange }: { d: Device; idx: TreeIndex; onCha
   function save(e: FormEvent) {
     e.preventDefault();
     if (authMode === "basic" && !d.has_password && !authPassword) {
-      setError("За режим с парола задайте парола.");
+      setError(t("За режим с парола задайте парола."));
       return;
     }
     const body: Record<string, unknown> = { name, site_id: siteId, auth_mode: authMode, auth_user: authUser };
     if (authPassword) body.auth_password = authPassword;
-    patch(body, "Запазено.").then(() => setAuthPassword(""));
+    patch(body, t("Запазено.")).then(() => setAuthPassword(""));
   }
 
   return (
     <>
       <form className="card form" onSubmit={save}>
-        <h3>Настройки</h3>
+        <h3>{t("Настройки")}</h3>
         <div className="grid2">
-          <label>Име<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label>Обект
+          <label>{t("Име")}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label>{t("Обект")}
             <select value={siteId} onChange={(e) => setSiteId(Number(e.target.value))}>
               {idx.sites().map((s) => <option key={s.id} value={s.id}>{idx.label(s)}</option>)}
             </select>
           </label>
         </div>
         {!d.info && <fieldset>
-          <legend>Достъп на плейъра</legend>
+          <legend>{t("Достъп на плейъра")}</legend>
           <label className="radio"><input type="radio" checked={authMode === "link"} onChange={() => setAuthMode("link")} />
-            Само таен линк</label>
+            {t("Само таен линк")}</label>
           <label className="radio"><input type="radio" checked={authMode === "basic"} onChange={() => setAuthMode("basic")} />
-            Таен линк + потребител/парола</label>
+            {t("Таен линк + потребител/парола")}</label>
           {authMode === "basic" && (
             <div className="grid2">
-              <label>Потребител<input value={authUser} onChange={(e) => setAuthUser(e.target.value)} required /></label>
-              <label>{d.has_password ? "Нова парола (по желание)" : "Парола"}
+              <label>{t("Потребител")}<input value={authUser} onChange={(e) => setAuthUser(e.target.value)} required /></label>
+              <label>{d.has_password ? t("Нова парола (по желание)") : t("Парола")}
                 <input type="password" autoComplete="new-password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} minLength={10} />
               </label>
             </div>
           )}
-          <p className="muted small">Режимът с парола важи за личния линк. Не всички плейъри го поддържат.</p>
+          <p className="muted small">{t("Режимът с парола важи за личния линк. Не всички плейъри го поддържат.")}</p>
         </fieldset>}
         {error && <div className="error">{error}</div>}
         {msg && <div className="ok">{msg}</div>}
-        <div className="buttons"><button className="primary">Запази</button></div>
+        <div className="buttons"><button className="primary">{t("Запази")}</button></div>
       </form>
 
       <div className="card">
-        {d.info ? <h3>Достъп</h3> : <>
-        <h3>Личен линк</h3>
+        {d.info ? <h3>{t("Достъп")}</h3> : <>
+        <h3>{t("Личен линк")}</h3>
         <div className="copy-row">
           <code className="mono">{d.url}</code>
-          <button className="ghost" onClick={() => navigator.clipboard.writeText(d.url ?? "")}>Копирай</button>
+          <button className="ghost" onClick={() => navigator.clipboard.writeText(d.url ?? "")}>{t("Копирай")}</button>
         </div>
         <p className="muted small">
-          Плейърите могат да ползват и общия адрес <code>{(d.url ?? "").replace(/\/d\/[^/]+\/index\.smil$/, "/p/index.smil")}</code>:
-          тогава се разпознават по UUID. Адресът на хъба се сменя от Настройки.
+          {t("Плейърите могат да ползват и общия адрес")} <code>{(d.url ?? "").replace(/\/d\/[^/]+\/index\.smil$/, "/p/index.smil")}</code>:{" "}
+          {t("тогава се разпознават по UUID. Адресът на хъба се сменя от Настройки.")}
         </p>
         </>}
         <div className="buttons">
-          {!d.info && <button className="ghost" onClick={() => confirm("Старият линк спира да работи веднага. Продължаваме?") &&
-            patch({ rotate_token: true }, "Нов линк е генериран.")}>Генерирай нов линк</button>}
+          {!d.info && <button className="ghost" onClick={() => confirm(t("Старият линк спира да работи веднага. Продължаваме?")) &&
+            patch({ rotate_token: true }, t("Нов линк е генериран."))}>{t("Генерирай нов линк")}</button>}
           {d.status === "blocked" ? (
-            <button className="ghost" onClick={() => patch({ status: "active" }, "Устройството е активирано.")}>Активирай</button>
+            <button className="ghost" onClick={() => patch({ status: "active" }, t("Устройството е активирано."))}>{t("Активирай")}</button>
           ) : (
-            <button className="ghost danger" onClick={() => confirm("Блокираното устройство спира да получава съдържание. Продължаваме?") &&
-              patch({ status: "blocked" }, "Устройството е блокирано.")}>Блокирай</button>
+            <button className="ghost danger" onClick={() => confirm(t("Блокираното устройство спира да получава съдържание. Продължаваме?")) &&
+              patch({ status: "blocked" }, t("Устройството е блокирано."))}>{t("Блокирай")}</button>
           )}
         </div>
       </div>

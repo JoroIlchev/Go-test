@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, errorText, type TreeNode } from "./api";
 import type { Selection } from "./App";
+import { t } from "./i18n";
 
 export function NewClientPanel({ onChange, onSelect }: { onChange: () => Promise<void>; onSelect: (s: Selection) => void }) {
   const [name, setName] = useState("");
@@ -19,15 +20,15 @@ export function NewClientPanel({ onChange, onSelect }: { onChange: () => Promise
 
   return (
     <section>
-      <h2>Нов клиент</h2>
+      <h2>{t("Нов клиент")}</h2>
       <form className="card form" onSubmit={submit}>
         <label>
-          Име на клиента
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Иванов ЕООД" required autoFocus />
+          {t("Име на клиента")}
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Иванов ЕООД")} required autoFocus />
         </label>
         {error && <div className="error">{error}</div>}
-        <div><button className="primary">Създай</button></div>
-        <p className="muted">След това добавете направления и обекти, и създайте главен админ на клиента.</p>
+        <div><button className="primary">{t("Създай")}</button></div>
+        <p className="muted">{t("След това добавете направления и обекти, и създайте главен админ на клиента.")}</p>
       </form>
     </section>
   );
