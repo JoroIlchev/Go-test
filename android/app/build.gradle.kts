@@ -21,8 +21,8 @@ android {
         applicationId = "app.marquee.player"
         minSdk = 25 // Android 7.1
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 7
+        versionName = "0.7.0"
     }
 
     signingConfigs {
