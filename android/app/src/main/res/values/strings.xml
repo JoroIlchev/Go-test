@@ -23,4 +23,7 @@
     <string name="settings_title">Настройки на Marquee Player</string>
     <string name="save">Запази</string>
     <string name="cancel">Отказ</string>
+    <string name="exit">Изход към настройките на Android</string>
+    <string name="home_settings">Смени началния екран</string>
+    <string name="offline_cached">Часът на устройството: %1$s · задръжте 3 сек. за настройки</string>
 </resources>

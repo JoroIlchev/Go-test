@@ -2,6 +2,8 @@ package app.marquee.player
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Bundle
@@ -12,10 +14,13 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 /** The whole player: the stage plays content, the status screen covers it
@@ -135,6 +140,11 @@ class MainActivity : Activity(), Syncer.Listener {
             m == null -> status.show("", tr(R.string.connecting), "", 0.09f)
             m.status == "pending" ->
                 status.show(tr(R.string.pairing_code), m.pairingCode, tr(R.string.pairing_hint))
+            // The saved campaign plays offline by the device's clock; a wrong
+            // clock is the usual reason it does not, so show it.
+            connection == Syncer.Connection.OFFLINE ->
+                status.show(tr(R.string.offline), m.name.ifEmpty { tr(R.string.no_name) },
+                    tr(R.string.offline_cached, SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).format(Date(hub?.now() ?: 0L))), 0.08f)
             files.second > 0 && files.first < files.second && m.segmentAt(hub?.now() ?: 0L) != null ->
                 status.show(tr(R.string.downloading), tr(R.string.files_of, files.first, files.second), m.name, 0.12f)
             else ->
@@ -185,6 +195,8 @@ class MainActivity : Activity(), Syncer.Listener {
             addView(TextView(this@MainActivity).apply { text = tr(R.string.hub_label) })
             addView(input)
             addView(about)
+            addView(leaveButton(R.string.exit, android.provider.Settings.ACTION_SETTINGS))
+            addView(leaveButton(R.string.home_settings, android.provider.Settings.ACTION_HOME_SETTINGS))
         }
         dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle(tr(R.string.settings_title))
@@ -200,6 +212,21 @@ class MainActivity : Activity(), Syncer.Listener {
             }
             .setNegativeButton(tr(R.string.cancel), null)
             .show()
+    }
+
+    /** The player is the home screen, so Home brings it back: these open
+     *  Android's settings (Wi-Fi, apps) or let another home screen take over. */
+    private fun leaveButton(label: Int, action: String) = Button(this).apply {
+        text = tr(label)
+        isAllCaps = false
+        setOnClickListener {
+            dialog?.dismiss()
+            try {
+                startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e: ActivityNotFoundException) {
+                startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

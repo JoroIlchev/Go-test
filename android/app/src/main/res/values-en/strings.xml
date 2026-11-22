@@ -21,4 +21,7 @@
     <string name="settings_title">Marquee Player settings</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
+    <string name="exit">Exit to Android settings</string>
+    <string name="home_settings">Change the home screen</string>
+    <string name="offline_cached">Device clock: %1$s · hold 3 s for settings</string>
 </resources>
