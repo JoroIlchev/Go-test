@@ -27,6 +27,12 @@ type DeviceInfo struct {
 	UptimeS    int64  `json:"uptime_s"`
 	// The player is the device owner: it updates itself without asking.
 	Owner bool `json:"owner,omitempty"`
+	// Android 10+: may come to the front by itself (boot, screen on, after an
+	// update). nil: older players that do not say.
+	Autostart *bool `json:"autostart,omitempty"`
+	// Android 8+: may install the updates the hub offers.
+	Installs *bool `json:"installs,omitempty"`
+	TV       bool  `json:"tv,omitempty"`
 }
 
 // ParsedInfo decodes what Marquee Player reported; nil for other players and unknown data.

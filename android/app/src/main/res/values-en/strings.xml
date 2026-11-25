@@ -7,7 +7,7 @@
     <string name="blocked">Blocked</string>
     <string name="blocked_hint">The device is blocked on the hub</string>
     <string name="offline">No connection to the hub</string>
-    <string name="offline_hint">Retrying… · hold 3 s for settings</string>
+    <string name="offline_hint">Retrying… · hold 3 s (or OK) for settings</string>
     <string name="connecting">Connecting…</string>
     <string name="pairing_code">Pairing code</string>
     <string name="pairing_hint">Enter the code in marquee → Pending devices</string>
@@ -23,5 +23,12 @@
     <string name="cancel">Cancel</string>
     <string name="exit">Exit to Android settings</string>
     <string name="home_settings">Change the home screen</string>
-    <string name="offline_cached">Device clock: %1$s · hold 3 s for settings</string>
+    <string name="perm_title">Permissions needed</string>
+    <string name="perm_start">Autostart: allow "Display over other apps" for Marquee Player, so it starts by itself when switched on and after an update.</string>
+    <string name="perm_install">Updates: allow "Install unknown apps" for Marquee Player, so it updates from the hub.</string>
+    <string name="allow">Allow</string>
+    <string name="later">Later</string>
+    <string name="allow_start">Allow autostart</string>
+    <string name="allow_install">Allow updates</string>
+    <string name="offline_cached">Device clock: %1$s · hold 3 s (or OK) for settings</string>
 </resources>

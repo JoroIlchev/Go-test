@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 
 /** Starts the player when the device boots, even if it is not the home screen,
- *  and again after it updated itself. */
+ *  and again after it updated itself. Android 10+ allows that only with
+ *  "display over other apps" (see Perms). */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        Watch.start(context)
         context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

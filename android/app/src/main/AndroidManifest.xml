@@ -7,11 +7,22 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Updates itself from the hub (see Updater.kt). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android 10+: coming to the front by itself needs "display over other apps". -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- TV sets: Watch brings the player back when the screen comes on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Runs on TV sets too, driven by the remote. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <!-- Hubs on a LAN or a bare IP speak plain HTTP. -->
     <application
         android:name=".App"
         android:allowBackup="false"
+        android:banner="@drawable/banner"
+        android:enableOnBackInvokedCallback="false"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="false"
@@ -47,6 +58,15 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <service
+            android:name=".Watch"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Digital signage: shows the player again when the TV screen turns on" />
+        </service>
 
         <receiver
             android:name=".UpdateReceiver"

@@ -61,7 +61,7 @@ function Hardware({ info: i, playerApp }: { info: DeviceInfo; playerApp?: string
     <div className="card">
       <h3>{t("Устройство")}</h3>
       <dl className="facts">
-        <dt>{t("Модел")}</dt><dd>{[i.manufacturer, i.model].filter(Boolean).join(" ") || "—"}</dd>
+        <dt>{t("Модел")}</dt><dd>{[i.manufacturer, i.model].filter(Boolean).join(" ") || "—"}{i.tv && <span className="muted"> · {t("телевизор")}</span>}</dd>
         <dt>Android</dt><dd>{i.android || "—"}</dd>
         <dt>{t("Екран")}</dt><dd>{i.screen_w && i.screen_h ? `${i.screen_w}×${i.screen_h}, ${i.screen_w >= i.screen_h ? t("хоризонтален") : t("вертикален")}` : "—"}</dd>
         <dt>{t("Видео до")}</dt><dd>{i.video_max_w ? `${i.video_max_w}×${i.video_max_h}${i.hevc ? t(", и H.265") : t(", само H.264")}` : "—"}</dd>
@@ -72,7 +72,14 @@ function Hardware({ info: i, playerApp }: { info: DeviceInfo; playerApp?: string
           {playerApp && (behind
             ? <> <span className="tag warn">{t("на хъба е {version}, ще се обнови", { version: playerApp })}</span></>
             : <span className="muted"> · {t("актуална")}</span>)}</dd>
-        <dt>{t("Обновяване")}</dt><dd>{i.owner ? t("Автоматично, без потвърждение") : t("Автоматично, с потвърждение на екрана")}</dd>
+        <dt>{t("Обновяване")}</dt><dd>{i.installs === false
+          ? <span className="tag warn">{t("Няма разрешение „Инсталиране на неизвестни приложения“: обновленията няма да минат")}</span>
+          : i.owner ? t("Автоматично, без потвърждение") : t("Автоматично, с потвърждение на екрана")}</dd>
+        {i.autostart !== undefined && <>
+          <dt>{t("Автоматичен старт")}</dt><dd>{i.autostart
+            ? t("Да")
+            : <span className="tag warn">{t("Няма разрешение „Показване върху други приложения“: няма да тръгва сам при включване и след обновяване")}</span>}</dd>
+        </>}
       </dl>
     </div>
   );

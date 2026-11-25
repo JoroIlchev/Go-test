@@ -9,7 +9,7 @@
     <string name="blocked">Блокирано</string>
     <string name="blocked_hint">Устройството е блокирано в хъба</string>
     <string name="offline">Няма връзка с хъба</string>
-    <string name="offline_hint">Опитва отново… · задръжте 3 сек. за настройки</string>
+    <string name="offline_hint">Опитва отново… · задръжте 3 сек. (или OK) за настройки</string>
     <string name="connecting">Свързване…</string>
     <string name="pairing_code">Код за свързване</string>
     <string name="pairing_hint">Въведете кода в marquee → Чакащи устройства</string>
@@ -25,5 +25,12 @@
     <string name="cancel">Отказ</string>
     <string name="exit">Изход към настройките на Android</string>
     <string name="home_settings">Смени началния екран</string>
-    <string name="offline_cached">Часът на устройството: %1$s · задръжте 3 сек. за настройки</string>
+    <string name="perm_title">Нужни разрешения</string>
+    <string name="perm_start">Автоматичен старт: разрешете „Показване върху други приложения“ за Marquee Player, за да тръгва сам при включване и след обновяване.</string>
+    <string name="perm_install">Обновявания: разрешете „Инсталиране на неизвестни приложения“ за Marquee Player, за да се обновява от хъба.</string>
+    <string name="allow">Разреши</string>
+    <string name="later">По-късно</string>
+    <string name="allow_start">Разреши автоматичния старт</string>
+    <string name="allow_install">Разреши обновяванията</string>
+    <string name="offline_cached">Часът на устройството: %1$s · задръжте 3 сек. (или OK) за настройки</string>
 </resources>

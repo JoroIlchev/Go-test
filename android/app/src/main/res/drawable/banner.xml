@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TV home screen's tile: the marquee mark on the brand purple. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:pathData="M160,35a55,55 0 1 1 0,110a55,55 0 1 1 0,-110z"
+        android:strokeWidth="7"
+        android:strokeColor="#47FFFFFF" />
+    <path
+        android:pathData="M160,55a35,35 0 1 1 0,70a35,35 0 1 1 0,-70z"
+        android:strokeWidth="8"
+        android:strokeColor="#99FFFFFF" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M160,72.5a17.5,17.5 0 1 1 0,35a17.5,17.5 0 1 1 0,-35z" />
+</vector>

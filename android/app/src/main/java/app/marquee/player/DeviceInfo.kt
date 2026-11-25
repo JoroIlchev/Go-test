@@ -42,6 +42,9 @@ class DeviceInfo(private val context: Context) {
             .put("uptime_s", SystemClock.elapsedRealtime() / 1000)
             .put("owner", (context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager)
                 .isDeviceOwnerApp(context.packageName))
+            .put("autostart", Perms.canStartItself(context))
+            .put("installs", Perms.canInstall(context))
+            .put("tv", Perms.isTv(context))
     }
 
     /** The largest common size a decoder plays at 30 fps, preferring hardware

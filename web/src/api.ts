@@ -77,6 +77,11 @@ export interface DeviceInfo {
   uptime_s: number;
   /** The player is the device owner: it updates itself without asking. */
   owner?: boolean;
+  /** May come to the front by itself (boot, screen on, after an update); absent from older players. */
+  autostart?: boolean;
+  /** May install the updates the hub offers. */
+  installs?: boolean;
+  tv?: boolean;
 }
 
 export interface Tree {

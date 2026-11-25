@@ -9,6 +9,7 @@ import android.content.res.Resources
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -24,8 +25,9 @@ import java.util.Date
 import java.util.Locale
 
 /** The whole player: the stage plays content, the status screen covers it
- *  whenever there is nothing to play. Holding a click (or a finger) for
- *  3 seconds anywhere opens the settings, as does the Menu key. */
+ *  whenever there is nothing to play. Holding a click (or a finger, or OK on
+ *  a remote) for 3 seconds anywhere opens the settings, as do the Menu key
+ *  and Back pressed 5 times. */
 class MainActivity : Activity(), Syncer.Listener {
     private lateinit var settings: Settings
     private lateinit var status: StatusView
@@ -44,6 +46,10 @@ class MainActivity : Activity(), Syncer.Listener {
     private var dialog: AlertDialog? = null
     /** Texts in the language the hub chose, whatever the system's is. */
     private lateinit var texts: Resources
+    private var backs = 0
+    private var firstBack = 0L
+    /** "Later" on the permissions question holds until the next start. */
+    private var permsLater = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +61,32 @@ class MainActivity : Activity(), Syncer.Listener {
         setContentView(root)
         root.addView(status, FrameLayout.LayoutParams(-1, -1))
         start()
+        Watch.start(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        askPerms()
+    }
+
+    /** Asks once per start for what the device needs to run on its own. */
+    private fun askPerms() {
+        if (permsLater || settings.hubUrl.isEmpty() || dialog?.isShowing == true) return
+        val start = Perms.canStartItself(this)
+        val install = Perms.canInstall(this)
+        if (start && install) return
+        val lines = listOfNotNull(
+            tr(R.string.perm_start).takeIf { !start },
+            tr(R.string.perm_install).takeIf { !install },
+        )
+        dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(tr(R.string.perm_title))
+            .setMessage(lines.joinToString("\n\n"))
+            .setPositiveButton(tr(R.string.allow)) { _, _ ->
+                if (!start) Perms.allowStart(this) else Perms.allowInstall(this)
+            }
+            .setNegativeButton(tr(R.string.later)) { _, _ -> permsLater = true }
+            .show()
     }
 
     private fun start() {
@@ -161,18 +193,31 @@ class MainActivity : Activity(), Syncer.Listener {
         return super.dispatchTouchEvent(ev)
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_S) {
-            showSettings()
-            return true
+    /** The remote: OK held for 3 s, Menu or Settings, or Back 5 times within
+     *  3 s open the settings. Back alone does nothing: a player has nowhere
+     *  to go back to. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val up = event.action == KeyEvent.ACTION_UP
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+                if (up) main.removeCallbacks(openSettings)
+                else if (event.repeatCount == 0) main.postDelayed(openSettings, 3000)
+            }
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_S -> if (up) showSettings()
+            KeyEvent.KEYCODE_BACK -> if (up) {
+                val now = SystemClock.uptimeMillis()
+                if (now - firstBack > 3000) {
+                    firstBack = now
+                    backs = 0
+                }
+                if (++backs >= 5) {
+                    backs = 0
+                    showSettings()
+                }
+            }
+            else -> return super.dispatchKeyEvent(event)
         }
-        return super.onKeyUp(keyCode, event)
-    }
-
-    // A player has nowhere to go back to.
-    @Deprecated("Activity API")
-    override fun onBackPressed() {
-        dialog?.dismiss()
+        return true
     }
 
     private fun showSettings() {
@@ -195,6 +240,8 @@ class MainActivity : Activity(), Syncer.Listener {
             addView(TextView(this@MainActivity).apply { text = tr(R.string.hub_label) })
             addView(input)
             addView(about)
+            if (!Perms.canStartItself(this@MainActivity)) addView(action(R.string.allow_start) { Perms.allowStart(this@MainActivity) })
+            if (!Perms.canInstall(this@MainActivity)) addView(action(R.string.allow_install) { Perms.allowInstall(this@MainActivity) })
             addView(leaveButton(R.string.exit, android.provider.Settings.ACTION_SETTINGS))
             addView(leaveButton(R.string.home_settings, android.provider.Settings.ACTION_HOME_SETTINGS))
         }
@@ -209,6 +256,7 @@ class MainActivity : Activity(), Syncer.Listener {
                     connection = Syncer.Connection.OK
                     start()
                 }
+                main.post { askPerms() }
             }
             .setNegativeButton(tr(R.string.cancel), null)
             .show()
@@ -216,16 +264,20 @@ class MainActivity : Activity(), Syncer.Listener {
 
     /** The player is the home screen, so Home brings it back: these open
      *  Android's settings (Wi-Fi, apps) or let another home screen take over. */
-    private fun leaveButton(label: Int, action: String) = Button(this).apply {
+    private fun leaveButton(label: Int, action: String) = action(label) {
+        try {
+            startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: ActivityNotFoundException) {
+            startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    private fun action(label: Int, run: () -> Unit) = Button(this).apply {
         text = tr(label)
         isAllCaps = false
         setOnClickListener {
             dialog?.dismiss()
-            try {
-                startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (e: ActivityNotFoundException) {
-                startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+            run()
         }
     }
 
