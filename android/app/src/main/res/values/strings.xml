@@ -19,7 +19,7 @@
     <string name="no_name">Без име</string>
     <string name="waiting">Очаква съдържание</string>
     <string name="about">Устройство %1$s · версия %2$s</string>
-    <string name="hub_label">Адрес на хъба, например 192.168.1.10:8080</string>
+    <string name="hub_label">Адрес на хъба</string>
     <string name="settings_title">Настройки на Marquee Player</string>
     <string name="save">Запази</string>
     <string name="cancel">Отказ</string>

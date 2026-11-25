@@ -17,7 +17,7 @@
     <string name="no_name">No name</string>
     <string name="waiting">Waiting for content</string>
     <string name="about">Device %1$s · version %2$s</string>
-    <string name="hub_label">Hub address, e.g. 192.168.1.10:8080</string>
+    <string name="hub_label">Hub address</string>
     <string name="settings_title">Marquee Player settings</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>

@@ -224,9 +224,10 @@ class MainActivity : Activity(), Syncer.Listener {
         if (dialog?.isShowing == true) return
         val pad = (resources.displayMetrics.density * 20).toInt()
         val input = EditText(this).apply {
-            setText(settings.hubUrl)
+            setText(settings.hubUrl.ifEmpty { Settings.DEFAULT_HUB })
+            setSelection(text.length)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            hint = "http://192.168.1.10:8080"
+            hint = Settings.DEFAULT_HUB
             setSingleLine()
         }
         val about = TextView(this).apply {

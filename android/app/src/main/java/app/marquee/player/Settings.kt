@@ -30,6 +30,9 @@ class Settings(context: Context) {
         private const val KEY_HUB = "hub_url"
         private const val KEY_LANG = "lang"
 
+        /** Offered in the settings until someone types another hub. */
+        const val DEFAULT_HUB = "http://marquee-media.online"
+
         /** "192.168.1.5:8080" → "http://192.168.1.5:8080"; no trailing slash. */
         fun normalizeHub(raw: String): String {
             var s = raw.trim().trimEnd('/')
