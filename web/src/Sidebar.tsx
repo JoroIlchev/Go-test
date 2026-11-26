@@ -42,7 +42,7 @@ export function Sidebar({ me, idx, pendingCount, approvalCount, sel, serverTime,
           <button className={"nav-item" + (sel?.type === "new-client" ? " active" : "")} onClick={() => onSelect({ type: "new-client" })}>
             + {t("Нов клиент")}
           </button>
-          {me.is_super && (
+          {(me.is_super || me.can_house) && (
             <button className={"nav-item" + (house && sel?.type === "node" && sel.id === house.id ? " active" : "")} onClick={onHouse}>
               ★ {t("Моята реклама")}
             </button>

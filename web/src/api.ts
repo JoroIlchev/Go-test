@@ -22,6 +22,7 @@ export interface User {
   clients: number[];
   can_billing: boolean;
   can_logs: boolean;
+  can_house: boolean; // the operator's own ads
   client_id: number | null;
   active: boolean;
   created_at: string;

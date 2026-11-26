@@ -33,8 +33,8 @@ func ManagesClient(u *store.User, clientID int64) bool {
 // node and everything below it; super admins can do everything everywhere,
 // managers everything in their clients.
 func Can(u *store.User, n *store.Node, p Perm) bool {
-	if n.House {
-		return u.IsSuper // the operator's own ads
+	if n.House { // the operator's own ads
+		return u.IsSuper || (u.IsManager && u.CanHouse)
 	}
 	if ManagesClient(u, n.ClientID) {
 		return true

@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"testing"
 	"testing/fstest"
 
@@ -415,6 +416,20 @@ func TestManagers(t *testing.T) {
 		"all_clients": true, "can_billing": true}}, http.StatusOK, nil)
 	m.mustDo("POST", "/api/devices", map[string]any{"site_id": siteB, "name": "tv"}, http.StatusCreated, nil)
 	m.mustDo("GET", "/api/billing", nil, http.StatusOK, nil)
+
+	// The operator's own ads only with their own tick.
+	var house struct{ ID int64 }
+	root.mustDo("POST", "/api/house", nil, http.StatusOK, &house)
+	m.mustDo("POST", "/api/house", nil, http.StatusForbidden, nil)
+	m.mustDo("POST", "/api/campaigns", map[string]any{"node_id": house.ID, "name": "ad"}, http.StatusForbidden, nil)
+	root.mustDo("PATCH", "/api/staff/"+itoa(mgr.ID), map[string]any{"access": map[string]any{"kind": "manager",
+		"all_clients": true, "can_billing": true, "can_house": true}}, http.StatusOK, nil)
+	m.mustDo("POST", "/api/house", nil, http.StatusOK, nil)
+	m.mustDo("POST", "/api/campaigns", map[string]any{"node_id": house.ID, "name": "ad"}, http.StatusCreated, nil)
+	m.mustDo("GET", "/api/tree", nil, http.StatusOK, &tree)
+	if !slices.ContainsFunc(tree.Nodes, func(n struct{ ID int64 }) bool { return n.ID == house.ID }) {
+		t.Fatal("manager with own ads does not see them in the tree")
+	}
 
 	// The only super admin cannot be switched off or demoted ...
 	var me struct{ ID int64 }

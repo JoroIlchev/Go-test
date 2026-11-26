@@ -20,6 +20,7 @@ type User struct {
 	Clients    []int64       `json:"clients"`
 	CanBilling bool          `json:"can_billing"`
 	CanLogs    bool          `json:"can_logs"`
+	CanHouse   bool          `json:"can_house"` // the operator's own ads
 	ClientID   sql.NullInt64 `json:"-"`
 	ClientRef  *int64        `json:"client_id"`
 	Active     bool          `json:"active"`
@@ -38,12 +39,12 @@ type Role struct {
 }
 
 const userCols = `id, email, name, pass_hash, is_super, is_manager, all_clients, can_billing, can_logs,
-	client_id, active, created_at, lang`
+	can_house, client_id, active, created_at, lang`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PassHash, &u.IsSuper, &u.IsManager, &u.AllClients,
-		&u.CanBilling, &u.CanLogs, &u.ClientID, &u.Active, &u.CreatedAt, &u.Lang)
+		&u.CanBilling, &u.CanLogs, &u.CanHouse, &u.ClientID, &u.Active, &u.CreatedAt, &u.Lang)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -183,13 +184,14 @@ func (s *Store) ActiveSupers(ctx context.Context) (int, error) {
 }
 
 // StaffAccess is what a staff member may do: Super, or a manager of Clients
-// (or AllClients) with the optional billing and logs pages.
+// (or AllClients) with the optional billing and logs pages and own ads.
 type StaffAccess struct {
 	Super      bool
 	AllClients bool
 	Clients    []int64
 	CanBilling bool
 	CanLogs    bool
+	CanHouse   bool
 }
 
 // CreateStaff adds a super admin or a manager.
@@ -216,9 +218,9 @@ func (s *Store) SetStaffAccess(ctx context.Context, id int64, a StaffAccess) err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE users SET is_super = ?, is_manager = ?, all_clients = ?, can_billing = ?, can_logs = ?
+		`UPDATE users SET is_super = ?, is_manager = ?, all_clients = ?, can_billing = ?, can_logs = ?, can_house = ?
 		 WHERE id = ? AND client_id IS NULL`,
-		a.Super, !a.Super, a.AllClients, a.CanBilling, a.CanLogs, id); err != nil {
+		a.Super, !a.Super, a.AllClients, a.CanBilling, a.CanLogs, a.CanHouse, id); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM manager_clients WHERE user_id = ?`, id); err != nil {

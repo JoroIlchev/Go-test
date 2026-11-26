@@ -10,11 +10,12 @@ interface Access {
   clients: number[];
   can_billing: boolean;
   can_logs: boolean;
+  can_house: boolean;
 }
 
 const accessOf = (u: User): Access => ({
   kind: u.is_super ? "super" : "manager", all_clients: u.all_clients, clients: u.clients,
-  can_billing: u.can_billing, can_logs: u.can_logs,
+  can_billing: u.can_billing, can_logs: u.can_logs, can_house: u.can_house,
 });
 
 /** The hub operator's people: super admins and managers (super admin only). */
@@ -36,7 +37,7 @@ export function TeamPanel({ me, clients, onMeChange }: { me: User; clients: Tree
   function scope(u: User) {
     if (u.is_super) return t("Всичко, вкл. настройки и екип");
     const list = u.all_clients ? t("Всички клиенти") : u.clients.length ? u.clients.map(clientName).join(", ") : t("Няма клиенти");
-    const extra = [u.can_billing && t("таксуване"), u.can_logs && t("логове")].filter(Boolean).join(", ");
+    const extra = [u.can_billing && t("таксуване"), u.can_logs && t("логове"), u.can_house && t("моята реклама")].filter(Boolean).join(", ");
     return extra ? `${list} · ${extra}` : list;
   }
 
@@ -85,7 +86,7 @@ function StaffForm({ user, me, clients, onCancel, onDone }: {
   const [password, setPassword] = useState("");
   const [active, setActive] = useState(user?.active ?? true);
   const [a, setA] = useState<Access>(user ? accessOf(user) :
-    { kind: "manager", all_clients: false, clients: [], can_billing: false, can_logs: false });
+    { kind: "manager", all_clients: false, clients: [], can_billing: false, can_logs: false, can_house: false });
   const [error, setError] = useState("");
   const set = (p: Partial<Access>) => setA({ ...a, ...p });
   const toggle = (id: number, on: boolean) =>
@@ -147,6 +148,8 @@ function StaffForm({ user, me, clients, onCancel, onDone }: {
             {t("Достъп до таксуване (само за неговите клиенти)")}</label>
           <label className="check"><input type="checkbox" checked={a.can_logs} onChange={(e) => set({ can_logs: e.target.checked })} />
             {t("Достъп до логовете на хъба")}</label>
+          <label className="check"><input type="checkbox" checked={a.can_house} onChange={(e) => set({ can_house: e.target.checked })} />
+            {t("Може да вижда и публикува „Моята реклама“ (върви на екраните на всички клиенти)")}</label>
         </fieldset>
       )}
       {user && (

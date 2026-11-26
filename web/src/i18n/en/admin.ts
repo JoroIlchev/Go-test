@@ -58,6 +58,7 @@ export const admin: Record<string, string> = {
   "Няма клиенти": "No clients",
   "таксуване": "billing",
   "логове": "logs",
+  "моята реклама": "my ads",
   "Екип": "Team",
   "Хората на хъба.": "The hub's people.",
   "може всичко.": "can do everything.",
@@ -78,6 +79,7 @@ export const admin: Record<string, string> = {
     "Clients the manager creates are assigned to them automatically.",
   "Достъп до таксуване (само за неговите клиенти)": "Access to billing (their clients only)",
   "Достъп до логовете на хъба": "Access to the hub logs",
+  "Може да вижда и публикува „Моята реклама“ (върви на екраните на всички клиенти)": "Can see and publish “My ads” (they play on the screens of every client)",
 
   // UsersSection
   "Потребители": "Users",

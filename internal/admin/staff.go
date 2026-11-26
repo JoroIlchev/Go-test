@@ -16,12 +16,13 @@ type staffAccessIn struct {
 	Clients    []int64 `json:"clients"`
 	CanBilling bool    `json:"can_billing"`
 	CanLogs    bool    `json:"can_logs"`
+	CanHouse   bool    `json:"can_house"`
 }
 
 // access checks the input; ok is false after an error was written.
 func (s *Server) access(w http.ResponseWriter, r *http.Request, in staffAccessIn) (store.StaffAccess, bool) {
 	a := store.StaffAccess{Super: in.Kind == "super", AllClients: in.AllClients, Clients: in.Clients,
-		CanBilling: in.CanBilling, CanLogs: in.CanLogs}
+		CanBilling: in.CanBilling, CanLogs: in.CanLogs, CanHouse: in.CanHouse}
 	if in.Kind != "super" && in.Kind != "manager" {
 		writeErr(w, http.StatusBadRequest, "kind must be super or manager")
 		return a, false
