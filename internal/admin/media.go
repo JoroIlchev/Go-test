@@ -120,7 +120,13 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	nodeOf := s.nodeLookup(r)
 	results := []uploadResult{}
-	prep := "" // the hub settings unless a "prep" field comes before the files
+	// The choice of the node (or one above it), else the hub settings; a
+	// "prep" field before the files overrides it.
+	prep, _, err := s.nodePrep(r.Context(), n)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {

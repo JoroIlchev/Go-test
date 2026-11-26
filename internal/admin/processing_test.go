@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"marquee/internal/media"
+	"marquee/internal/store"
 )
 
 func testJPEG(w, h int) []byte {
@@ -82,6 +83,54 @@ func TestUploadChoosesProcessing(t *testing.T) {
 
 	if code, _ := root.uploadWith(ivanov, "bad.jpg", testJPEG(64, 64), prep("12x12")); code != http.StatusBadRequest {
 		t.Fatalf("invalid choice accepted: %d", code)
+	}
+}
+
+// A client's admin sets how uploads are prepared for the client; sites below
+// inherit it, editors only see it.
+func TestNodeProcessingChoice(t *testing.T) {
+	e := newEnv(t)
+	root := e.login("root@hub")
+	ivanov := root.mustNode(nil, "client", "Ivanov")
+	gym := root.mustNode(&ivanov, "site", "Gym")
+	root.mustUser("admin@ivanov", &ivanov, []store.Role{{NodeID: ivanov, Role: "admin"}})
+	root.mustUser("editor@ivanov", &ivanov, []store.Role{{NodeID: ivanov, Role: "editor", CanCreate: true}})
+	admin, editor := e.login("admin@ivanov"), e.login("editor@ivanov")
+
+	type dto struct {
+		Effective struct{ ImageScreen string `json:"image_screen"` }
+		Own       bool
+		FromID    int64 `json:"from_node_id"`
+		CanEdit   bool  `json:"can_edit"`
+	}
+	portrait := map[string]any{"prep": map[string]any{"image_screen": "1080x1920", "image_quality": "high",
+		"video_auto": "problems", "video_max": 720, "video_quality": "normal"}}
+	var d dto
+	if code, body := admin.do("PUT", "/api/nodes/"+itoa(ivanov)+"/prep", portrait, &d); code != 200 || !d.Own {
+		t.Fatalf("client admin sets the choice: %d %s", code, body)
+	}
+	if code, _ := editor.do("PUT", "/api/nodes/"+itoa(gym)+"/prep", portrait, nil); code != http.StatusForbidden {
+		t.Fatalf("editor sets the choice: want 403, got %d", code)
+	}
+	if code, body := editor.do("GET", "/api/nodes/"+itoa(gym)+"/prep", nil, &d); code != 200 ||
+		d.Effective.ImageScreen != "1080x1920" || d.Own || d.FromID != ivanov || d.CanEdit {
+		t.Fatalf("site inherits: %d %s", code, body)
+	}
+	bad := map[string]any{"prep": map[string]any{"image_screen": "12x12", "image_quality": "high",
+		"video_auto": "off", "video_max": 720, "video_quality": "normal"}}
+	if code, _ := admin.do("PUT", "/api/nodes/"+itoa(gym)+"/prep", bad, nil); code != http.StatusBadRequest {
+		t.Fatalf("invalid choice accepted: %d", code)
+	}
+
+	if media.FindTools("").FFmpeg != "" {
+		_, up := editor.upload(gym, "tall.jpg", testJPEG(1500, 2000))
+		if m := editor.waitReady(gym, up[0].Media.ID, 10*time.Second); m.Width != 1080 || m.Height != 1440 {
+			t.Fatalf("upload not fitted into the client's 1080x1920: %+v", m)
+		}
+	}
+
+	if code, _ := admin.do("PUT", "/api/nodes/"+itoa(ivanov)+"/prep", map[string]any{"prep": nil}, &d); code != 200 || d.Own || d.FromID != 0 {
+		t.Fatalf("back to the hub settings: %d %+v", code, d)
 	}
 }
 

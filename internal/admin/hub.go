@@ -84,6 +84,7 @@ var actionLabels = map[string]string{
 	"node.rename":        "Преименувано звено",
 	"node.delete":        "Изтрито звено",
 	"node.poll":          "Сменен график на проверките",
+	"node.prep":          "Сменена обработка при качване",
 	"device.pair":        "Свързано устройство",
 	"device.create":      "Добавено устройство",
 	"device.update":      "Променено устройство",

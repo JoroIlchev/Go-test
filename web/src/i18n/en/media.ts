@@ -35,11 +35,14 @@ export const media: Record<string, string> = {
   "Снимки (JPG, PNG, GIF), видео (MP4, MOV…) и аудио (MP3, AAC). Качват се в „{name}“ и се виждат от всичко под него.":
     "Images (JPG, PNG, GIF), video (MP4, MOV…) and audio (MP3, AAC). They are uploaded to “{name}” and visible to everything below it.",
   "Обработка при качване:": "Processing on upload:",
-  "ваш избор": "your choice",
-  "по подразбиране": "default",
-  "Важи за следващите файлове, които качвате тук (запомня се за този клиент в този браузър). Качените вече файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете „Без смаляване“ преди качването.":
-    "Applies to the next files you upload here (remembered for this client in this browser). Files already uploaded do not change — a shrunk image cannot be restored, so for a campaign with originals choose “No shrinking” before uploading.",
+  "по подразбиране за хъба": "hub default",
+  "зададено тук": "set here",
+  "наследено от „{name}“": "inherited from “{name}”",
+  "Важи за всички следващи файлове, качени в „{name}“ и под него, от всеки потребител. Качените вече файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете „Без смаляване“ преди качването.":
+    "Applies to every next file uploaded to “{name}” and below it, by any user. Files already uploaded do not change — a shrunk image cannot be restored, so for a campaign with originals choose “No shrinking” before uploading.",
   "Върни по подразбиране": "Back to the default",
+  "Наследи отгоре": "Inherit from above",
+  "Променя се от администратор на клиента.": "Changed by an admin of the client.",
   "На сървъра няма ffmpeg: видеата се качват, но не се проверяват и нямат миниатюри.":
     "There is no ffmpeg on the server: videos upload but are not checked and have no thumbnails.",
   "Всички": "All",

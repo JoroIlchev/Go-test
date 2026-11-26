@@ -231,6 +231,15 @@ export interface Prep {
   video_quality: Quality;
 }
 
+/** The processing choice that applies at a node, and where it comes from. */
+export interface NodePrep {
+  effective: Prep;
+  own: boolean; // set on this node
+  from_node_id: number; // 0 = the hub settings
+  from_name?: string;
+  can_edit: boolean;
+}
+
 export interface HubSettings extends Prep {
   public_url: string;
   hub_url: string;

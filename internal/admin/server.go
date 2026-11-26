@@ -153,6 +153,8 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 
 	s.mux.Handle("GET /api/nodes/{id}/poll", s.authed(s.nodePoll))
 	s.mux.Handle("PUT /api/nodes/{id}/poll", s.authed(s.setNodePoll))
+	s.mux.Handle("GET /api/nodes/{id}/prep", s.authed(s.getNodePrep))
+	s.mux.Handle("PUT /api/nodes/{id}/prep", s.authed(s.setNodePrep))
 	s.mux.Handle("PUT /api/settings/poll", s.superOnly(s.setDefaultPoll))
 	s.mux.Handle("GET /api/settings", s.superOnly(s.getSettings))
 	s.mux.Handle("PUT /api/settings", s.superOnly(s.putSettings))

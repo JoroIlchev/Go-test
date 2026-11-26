@@ -2,7 +2,7 @@ import type { Prep, Quality } from "./api";
 import { t } from "./i18n";
 
 /** The processing choice for uploads: in the hub settings (the default) and
- *  in the media library (for the next uploads). */
+ *  in the media library (per client or site, inherited below). */
 export function PrepFields({ value: p, onChange }: { value: Prep; onChange: (p: Partial<Prep>) => void }) {
   return (
     <>
@@ -62,7 +62,3 @@ export function prepSummary(p: Prep): string {
   const screen = screenText[p.image_screen];
   return `${screen ? t(screen) : p.image_screen} · ${video}`;
 }
-
-export const samePrep = (a: Prep, b: Prep) =>
-  a.image_screen === b.image_screen && a.image_quality === b.image_quality && a.video_auto === b.video_auto &&
-  a.video_max === b.video_max && a.video_quality === b.video_quality;

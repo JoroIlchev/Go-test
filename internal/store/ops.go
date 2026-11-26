@@ -9,6 +9,29 @@ import (
 
 // NodePolls returns the polling policies (raw JSON) set on the given nodes.
 func (s *Store) NodePolls(ctx context.Context, ids []int64) (map[int64]string, error) {
+	return s.nodeValues(ctx, `SELECT node_id, policy FROM node_poll`, ids)
+}
+
+// NodePreps returns the upload processing choices (raw JSON) set on the given nodes.
+func (s *Store) NodePreps(ctx context.Context, ids []int64) (map[int64]string, error) {
+	return s.nodeValues(ctx, `SELECT node_id, prep FROM node_prep`, ids)
+}
+
+// SetNodePrep sets the node's processing choice, or removes it (inherit) when prep is "".
+func (s *Store) SetNodePrep(ctx context.Context, nodeID int64, prep string, by int64) error {
+	if prep == "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM node_prep WHERE node_id = ?`, nodeID)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO node_prep (node_id, prep, updated_by, updated_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(node_id) DO UPDATE SET prep = excluded.prep, updated_by = excluded.updated_by,
+		 updated_at = excluded.updated_at`, nodeID, prep, by, now())
+	return err
+}
+
+// nodeValues runs a "SELECT node_id, value FROM table" query for the given nodes.
+func (s *Store) nodeValues(ctx context.Context, query string, ids []int64) (map[int64]string, error) {
 	out := map[int64]string{}
 	if len(ids) == 0 {
 		return out, nil
@@ -17,8 +40,7 @@ func (s *Store) NodePolls(ctx context.Context, ids []int64) (map[int64]string, e
 	for i, id := range ids {
 		args[i] = id
 	}
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT node_id, policy FROM node_poll WHERE node_id IN (`+placeholders(len(ids))+`)`, args...)
+	rows, err := s.db.QueryContext(ctx, query+` WHERE node_id IN (`+placeholders(len(ids))+`)`, args...)
 	if err != nil {
 		return nil, err
 	}

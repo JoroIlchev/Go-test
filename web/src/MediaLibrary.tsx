@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { api, errorText, uploadFile, type Media, type Prep, type TreeNode, type User } from "./api";
+import { api, errorText, uploadFile, type Media, type NodePrep, type Prep, type TreeNode, type User } from "./api";
 import { can, formatBytes, formatDuration, type TreeIndex } from "./model";
-import { PrepFields, prepSummary, samePrep } from "./PrepFields";
+import { PrepFields, prepSummary } from "./PrepFields";
 import { SlideshowDialog } from "./SlideshowDialog";
 import { locale, t } from "./i18n";
 import { warningText } from "./mediaText";
@@ -25,25 +25,6 @@ const ACCEPT = ".jpg,.jpeg,.png,.gif,.webp,.mp4,.m4v,.mov,.webm,.mkv,.avi,.mp3,.
 type KindFilter = "all" | "image" | "video" | "audio";
 const kindLabel = { image: "Снимка", video: "Видео", audio: "Аудио" }; // translated where shown
 
-// The processing choice is remembered per client in this browser.
-const prepKey = (clientId: number) => `marquee.prep.${clientId}`;
-function savedPrep(clientId: number): Prep | null {
-  try {
-    const raw = localStorage.getItem(prepKey(clientId));
-    return raw ? (JSON.parse(raw) as Prep) : null;
-  } catch {
-    return null;
-  }
-}
-function storePrep(clientId: number, p: Prep | null) {
-  try {
-    if (p) localStorage.setItem(prepKey(clientId), JSON.stringify(p));
-    else localStorage.removeItem(prepKey(clientId));
-  } catch {
-    /* storage blocked: the choice lasts until reload */
-  }
-}
-
 export function MediaLibrary({ me, idx, node }: Props) {
   const canUpload = can(me, node, idx, "create");
   const [items, setItems] = useState<Media[]>([]);
@@ -56,33 +37,42 @@ export function MediaLibrary({ me, idx, node }: Props) {
   const [preview, setPreview] = useState<Media | null>(null);
   const [slideshow, setSlideshow] = useState(false);
   const [error, setError] = useState("");
-  const [hubPrep, setHubPrep] = useState<Prep | null>(null);
-  const [ownPrep, setOwnPrep] = useState<Prep | null>(() => savedPrep(node.client_id));
+  const [prepInfo, setPrepInfo] = useState<NodePrep | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const keyRef = useRef(0);
 
   const load = useCallback(async () => {
     try {
-      const res = await api<{ items: Media[]; ffmpeg: boolean; prep: Prep }>("GET", `/api/media?node_id=${node.id}`);
+      const res = await api<{ items: Media[]; ffmpeg: boolean }>("GET", `/api/media?node_id=${node.id}`);
       setItems(res.items);
       setFfmpeg(res.ffmpeg);
-      setHubPrep(res.prep);
     } catch (e) {
       setError(errorText(e));
     }
   }, [node.id]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => setOwnPrep(savedPrep(node.client_id)), [node.client_id]);
+  // The processing choice is kept on the hub per client or site and applies
+  // to every upload below it, whoever uploads.
+  useEffect(() => {
+    api<NodePrep>("GET", `/api/nodes/${node.id}/prep`).then(setPrepInfo).catch((e) => setError(errorText(e)));
+  }, [node.id]);
 
-  const prep = ownPrep ?? hubPrep;
-  function changePrep(p: Partial<Prep>) {
-    if (!prep) return;
-    const next = { ...prep, ...p };
-    const own = hubPrep && samePrep(next, hubPrep) ? null : next;
-    setOwnPrep(own);
-    storePrep(node.client_id, own);
+  async function savePrep(p: Prep | null) {
+    setError("");
+    try {
+      setPrepInfo(await api<NodePrep>("PUT", `/api/nodes/${node.id}/prep`, { prep: p }));
+    } catch (e) {
+      setError(errorText(e));
+    }
   }
+  const prep = prepInfo?.effective;
+  function changePrep(p: Partial<Prep>) {
+    if (prep) savePrep({ ...prep, ...p });
+  }
+  let prepFrom = t("по подразбиране за хъба");
+  if (prepInfo?.own) prepFrom = t("зададено тук");
+  else if (prepInfo?.from_name) prepFrom = t("наследено от „{name}“", { name: prepInfo.from_name });
 
   // Poll while the server is still probing or converting something.
   const busy = items.some((m) => m.status === "processing");
@@ -100,7 +90,7 @@ export function MediaLibrary({ me, idx, node }: Props) {
     for (let i = 0; i < files.length; i++) {
       const { key } = queued[i];
       try {
-        const res = await uploadFile(node.id, files[i], (progress) => patch(key, { progress }), ownPrep ?? undefined);
+        const res = await uploadFile(node.id, files[i], (progress) => patch(key, { progress }));
         if (res.error) patch(key, { error: errorText(new Error(res.error)), done: true });
         else patch(key, { progress: 1, done: true });
       } catch (e) {
@@ -151,16 +141,22 @@ export function MediaLibrary({ me, idx, node }: Props) {
         <details className="prep">
           <summary>
             ⚙ {t("Обработка при качване:")} <strong>{prepSummary(prep)}</strong>
-            <span className="muted small"> — {ownPrep ? t("ваш избор") : t("по подразбиране")}</span>
+            <span className="muted small"> — {prepFrom}</span>
           </summary>
           <p className="muted small">
-            {t("Важи за следващите файлове, които качвате тук (запомня се за този клиент в този браузър). Качените вече файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете „Без смаляване“ преди качването.")}
+            {t("Важи за всички следващи файлове, качени в „{name}“ и под него, от всеки потребител. Качените вече файлове не се променят — смалената снимка не може да се върне, затова за кампания с оригинали изберете „Без смаляване“ преди качването.", { name: node.name })}
           </p>
-          <PrepFields value={prep} onChange={changePrep} />
-          {ownPrep && (
-            <p><button className="ghost" onClick={() => { setOwnPrep(null); storePrep(node.client_id, null); }}>
-              {t("Върни по подразбиране")}
-            </button></p>
+          {prepInfo?.can_edit ? (
+            <>
+              <PrepFields value={prep} onChange={changePrep} />
+              {prepInfo.own && (
+                <p><button className="ghost" onClick={() => savePrep(null)}>
+                  {node.parent_id ? t("Наследи отгоре") : t("Върни по подразбиране")}
+                </button></p>
+              )}
+            </>
+          ) : (
+            <p className="muted small">{t("Променя се от администратор на клиента.")}</p>
           )}
         </details>
       )}

@@ -19,6 +19,7 @@ func init() {
 		"Преименувано звено":                  "Node renamed",
 		"Изтрито звено":                       "Node deleted",
 		"Сменен график на проверките":         "Check schedule changed",
+		"Сменена обработка при качване":       "Upload processing changed",
 		"Свързано устройство":                 "Device paired",
 		"Добавено устройство":                 "Device added",
 		"Променено устройство":                "Device changed",
