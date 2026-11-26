@@ -23,7 +23,7 @@ import (
 
 // version is the hub's own version, shown in the admin panel. Raise it with
 // every release; a build can also set it: -ldflags "-X main.version=1.2.3".
-var version = "1.0.0"
+var version = "1.1.0"
 
 func main() {
 	log := slog.New(logx.New(os.Stdout, slog.LevelInfo))
