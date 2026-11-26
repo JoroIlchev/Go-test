@@ -16,6 +16,7 @@ import { NewClientPanel } from "./NewClientPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { BillingPanel } from "./BillingPanel";
 import { LogsPanel } from "./LogsPanel";
+import { TrustedPanel } from "./TrustedPanel";
 
 export type Selection =
   | { type: "node"; id: number }
@@ -28,6 +29,7 @@ export type Selection =
   | { type: "billing" }
   | { type: "logs" }
   | { type: "team" }
+  | { type: "trusted" }
   | null;
 
 export function App() {
@@ -98,7 +100,9 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
       <p className="phone-only"><button className="primary" onClick={() => setMenu(true)}>{t("Отвори менюто")}</button></p>
     </div>
   );
-  if (idx && tree && sel) {
+  if (sel?.type === "trusted") {
+    main = <TrustedPanel />;
+  } else if (idx && tree && sel) {
     if (sel.type === "node" && idx.byId.has(sel.id)) {
       main = <NodePanel key={sel.id} me={me} idx={idx} node={idx.byId.get(sel.id)!} serverTime={tree.server_time}
         onChange={reload} onSelect={setSel} />;
@@ -138,6 +142,12 @@ function Shell({ me, onMe, onLogout }: { me: User; onMe: (u: User) => void; onLo
       <aside className="sidebar">
         {idx && <Sidebar me={me} idx={idx} pendingCount={pending.length} approvalCount={approvals.length} sel={sel} onSelect={setSel}
           serverTime={tree!.server_time} onHouse={openHouse} />}
+        <div className="side-foot">
+          <button className={"nav-item" + (sel?.type === "trusted" ? " active" : "")} onClick={() => setSel({ type: "trusted" })}>
+            {t("Устройства за вход")}
+          </button>
+          {tree?.hub_version && <div className="hub-version">{t("Хъб")} v{tree.hub_version}</div>}
+        </div>
       </aside>
       <main className="main">{main}</main>
     </div>

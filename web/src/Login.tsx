@@ -7,6 +7,7 @@ import { api, errorText, type User } from "./api";
 export function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +16,7 @@ export function Login({ onLogin }: { onLogin: (u: User) => void }) {
     setBusy(true);
     setError("");
     try {
-      onLogin(await api<User>("POST", "/api/login", { email, password }));
+      onLogin(await api<User>("POST", "/api/login", { email, password, remember }));
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -35,6 +36,11 @@ export function Login({ onLogin }: { onLogin: (u: User) => void }) {
           {t("Парола")}
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
+        <label className="check">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          {t("Запомни това устройство")}
+        </label>
+        {remember && <p className="muted small">{t("Запомненото устройство влиза дори докато някой друг опитва да познае паролата. Не го отбелязвайте на чужд компютър.")}</p>}
         {error && <div className="error">{error}</div>}
         <button className="primary" disabled={busy}>{t("Вход")}</button>
         <div className="login-lang"><LangSwitch /></div>

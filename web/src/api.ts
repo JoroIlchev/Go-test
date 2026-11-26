@@ -29,6 +29,16 @@ export interface User {
   roles: Role[];
 }
 
+/** A browser the user chose to remember at login. */
+export interface TrustedDevice {
+  id: number;
+  ip: string;
+  user_agent: string;
+  created_at: string;
+  last_used_at: string;
+  current: boolean; // the browser asking
+}
+
 export interface TreeNode {
   id: number;
   parent_id: number | null;
@@ -90,6 +100,7 @@ export interface Tree {
   server_time: string;
   hub_url?: string; // super admin only
   player_app?: string; // Marquee Player version the hub hands out
+  hub_version?: string;
 }
 
 export interface MediaWarning {

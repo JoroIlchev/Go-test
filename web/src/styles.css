@@ -81,7 +81,10 @@ code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
 .lang-switch button.on { background: var(--accent-soft); color: var(--accent); }
 .login-lang { display: flex; justify-content: center; margin-top: 12px; }
 .badge { margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 12px; }
-.sidebar { grid-area: side; overflow: auto; background: var(--surface); border-right: 1px solid var(--border); }
+.sidebar { grid-area: side; overflow: auto; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.sidebar > .tree { flex: 1; }
+.side-foot { position: sticky; bottom: 0; display: flex; flex-direction: column; padding: 8px 8px 0; border-top: 1px solid var(--border); background: var(--surface); }
+.hub-version { padding: 6px 4px; font-size: 11px; color: var(--muted); }
 .main { grid-area: main; overflow: auto; padding: 24px; }
 .main > section { max-width: 980px; display: flex; flex-direction: column; gap: 16px; }
 

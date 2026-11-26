@@ -307,9 +307,13 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, upd UserUpdate) error 
 			return err
 		}
 	}
-	// A password change or deactivation ends every open session of the user.
+	// A password change or deactivation ends every open session of the user
+	// and forgets the browsers remembered with the old password.
 	if upd.PassHash != nil || (upd.Active != nil && !*upd.Active) {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM trusted_devices WHERE user_id = ?`, id); err != nil {
 			return err
 		}
 	}

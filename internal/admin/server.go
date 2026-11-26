@@ -47,6 +47,7 @@ type Server struct {
 	app          *apk.File
 	defaultPoll  poll.Policy
 	backup       *ops.Backup
+	version      string
 	mux          *http.ServeMux
 }
 
@@ -71,6 +72,8 @@ type Config struct {
 	// AppFile is the Marquee Player APK the hub hands out; its version is
 	// shown next to the one each device runs.
 	AppFile string
+	// Version is the hub's own version, shown at the foot of the tree.
+	Version string
 }
 
 func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
@@ -89,6 +92,7 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 		loc:          cfg.Loc,
 		defaultPoll:  cfg.DefaultPoll,
 		backup:       cfg.Backup,
+		version:      cfg.Version,
 		app:          apk.NewFile(cfg.AppFile),
 		mux:          http.NewServeMux(),
 	}
@@ -106,6 +110,9 @@ func New(st *store.Store, log *slog.Logger, cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/logout", s.logout)
 	s.mux.Handle("GET /api/me", s.authed(s.me))
 	s.mux.Handle("PUT /api/me/lang", s.authed(s.setLang))
+	s.mux.Handle("GET /api/me/trusted", s.authed(s.listTrusted))
+	s.mux.Handle("DELETE /api/me/trusted/{id}", s.authed(s.forgetTrusted))
+	s.mux.Handle("DELETE /api/me/trusted", s.authed(s.forgetAllTrusted))
 
 	s.mux.Handle("GET /api/tree", s.authed(s.tree))
 	s.mux.Handle("POST /api/nodes", s.authed(s.createNode))
@@ -228,30 +235,49 @@ func (s *Server) authed(h http.HandlerFunc) http.Handler {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Email, Password string }
+	var in struct {
+		Email, Password string
+		Remember        bool // remember this browser
+	}
 	if !readJSON(w, r, &in) {
 		return
 	}
 	ip := clientIP(r)
-	if s.limiter.Locked("email:"+in.Email, "ip:"+ip) {
-		writeErr(w, http.StatusTooManyRequests, "too many failed attempts, try again later")
-		return
-	}
 	u, err := s.store.UserByEmail(r.Context(), in.Email)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.fail(w, err)
+		return
+	}
+	// A browser the user remembered has its own failure count. Someone
+	// guessing the password elsewhere locks out the e-mail and their own IP,
+	// never the user's remembered browsers.
+	dev, err := s.trustedDevice(r, u)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	keys := []string{"email:" + in.Email, "ip:" + ip}
+	if dev != nil {
+		keys = []string{"trusted:" + strconv.FormatInt(dev.ID, 10)}
+	}
+	if s.limiter.Locked(keys...) {
+		writeErr(w, http.StatusTooManyRequests, "too many failed attempts, try again later")
 		return
 	}
 	if u == nil {
 		auth.BurnPasswordCheck(in.Password)
 	}
 	if u == nil || !u.Active || !auth.CheckPassword(u.PassHash, in.Password) {
-		s.limiter.Fail("email:"+in.Email, "ip:"+ip)
-		s.log.Warn("Неуспешен вход", "имейл", in.Email, "ip", ip)
+		s.limiter.Fail(keys...)
+		s.log.Warn("Неуспешен вход", "имейл", in.Email, "ip", ip, "запомнено устройство", dev != nil)
 		writeErr(w, http.StatusUnauthorized, "wrong e-mail or password")
 		return
 	}
-	s.limiter.Reset("email:" + in.Email)
+	s.limiter.Reset(keys[0])
+	if err := s.rememberDevice(w, r, u, dev, in.Remember); err != nil {
+		s.fail(w, err)
+		return
+	}
 	token, hash := auth.NewSessionToken()
 	if err := s.store.CreateSession(r.Context(), hash, u.ID, ip, r.UserAgent(), sessionTTL); err != nil {
 		s.fail(w, err)

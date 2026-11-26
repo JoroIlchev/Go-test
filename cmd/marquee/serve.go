@@ -147,7 +147,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 		PublicURL: c.publicURL, PlayerScheme: scheme, PlayerPort: port, Logs: logs,
 		Web: web.Dist(), Storage: storage, Worker: worker,
 		MaxUpload: c.maxUploadMB << 20, Loc: loc, DefaultPoll: poll.Interval(c.refresh), Backup: backup,
-		AppFile: appFile(),
+		AppFile: appFile(), Version: version,
 	}
 
 	type server struct {
@@ -214,7 +214,7 @@ func run(ctx context.Context, c *config, log *slog.Logger, logs *logx.DailyFile)
 		}
 		return nil
 	})
-	log.Info("marquee е стартиран", "данни", c.dataDir)
+	log.Info("marquee е стартиран", "версия", version, "данни", c.dataDir)
 	hub := adminSrv.HubURL(ctx)
 	if ops.IsPrivate(hub) {
 		log.Warn("Адрес за устройствата е вътрешен", "адрес", hub, "решение", i18n.T("публичният IP се задава в Настройки"))

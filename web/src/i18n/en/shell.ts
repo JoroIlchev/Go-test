@@ -1,8 +1,22 @@
 // English for the Bulgarian texts of the admin, keyed by the Bulgarian text.
 export const shell: Record<string, string> = {
+  "Запомни това устройство": "Remember this device",
+  "Запомненото устройство влиза дори докато някой друг опитва да познае паролата. Не го отбелязвайте на чужд компютър.":
+    "A remembered device can sign in even while someone else is trying to guess the password. Do not tick this on someone else's computer.",
+  "Устройства за вход": "Sign-in devices",
+  "Забрави всички": "Forget all",
+  "Забрави": "Forget",
+  "Браузъри, в които сте влезли с отметка „Запомни това устройство“. Те влизат дори докато някой друг опитва да познае паролата ви. Паролата се иска винаги. При смяна на паролата всички се забравят, а неизползван 90 дни се забравя сам.":
+    "Browsers you signed in from with “Remember this device” ticked. They can sign in even while someone else is trying to guess your password. The password is always asked. A password change forgets them all, and one unused for 90 days is forgotten by itself.",
+  "Няма запомнени устройства.": "No remembered devices.",
+  "Браузър": "Browser",
+  "Последен вход": "Last sign-in",
+  "Запомнено": "Remembered",
+  "това устройство": "this device",
   "Изберете звено от дървото вляво.": "Pick a node in the tree on the left.",
   "Отвори менюто": "Open the menu",
   "Меню": "Menu",
+  "Хъб": "Hub",
   "Супер Админ": "Super Admin",
   "Мениджър": "Manager",
   "Изход": "Sign out",

@@ -144,6 +144,9 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{
 		"nodes": nodes, "devices": devices, "server_time": time.Now().UTC().Format(time.RFC3339),
 	}
+	if s.version != "" {
+		out["hub_version"] = s.version
+	}
 	if auth.Staff(u) {
 		out["hub_url"] = hub
 	}

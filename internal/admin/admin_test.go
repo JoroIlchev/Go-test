@@ -274,6 +274,95 @@ func TestLoginLockout(t *testing.T) {
 	}
 }
 
+// Someone guessing the super admin's password locks out the e-mail, but not
+// a browser the admin remembered; a password change forgets the browsers.
+func TestTrustedDeviceSurvivesLockout(t *testing.T) {
+	e := newEnv(t)
+	jar, _ := cookiejar.New(nil)
+	mine := &client{e: e, http: &http.Client{Jar: jar}}
+	if code, body := mine.do("POST", "/api/login", map[string]any{"email": "root@hub", "password": pw, "remember": true}, nil); code != 200 {
+		t.Fatalf("login: %d %s", code, body)
+	}
+	jar2, _ := cookiejar.New(nil)
+	bot := &client{e: e, http: &http.Client{Jar: jar2}}
+	for i := 0; i < 10; i++ {
+		bot.do("POST", "/api/login", map[string]string{"email": "root@hub", "password": "wrong-password"}, nil)
+	}
+	if code, _ := bot.do("POST", "/api/login", map[string]string{"email": "root@hub", "password": pw}, nil); code != http.StatusTooManyRequests {
+		t.Fatalf("unknown browser: want 429, got %d", code)
+	}
+	if code, body := mine.do("POST", "/api/login", map[string]string{"email": "root@hub", "password": pw}, nil); code != 200 {
+		t.Fatalf("remembered browser during an attack: %d %s", code, body)
+	}
+
+	var list []struct {
+		ID      int64
+		Current bool
+	}
+	if code, body := mine.do("GET", "/api/me/trusted", nil, &list); code != 200 || len(list) != 1 || !list[0].Current {
+		t.Fatalf("list: %d %s", code, body)
+	}
+
+	// The cookie belongs to root: it does not get another account past the
+	// lock of this IP.
+	hash, _ := auth.HashPassword(pw)
+	if _, err := e.st.CreateUser(context.Background(), "other@hub", "Other", hash, true, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := mine.do("POST", "/api/login", map[string]string{"email": "other@hub", "password": pw}, nil); code != http.StatusTooManyRequests {
+		t.Fatalf("root's browser signing in as other: want 429, got %d", code)
+	}
+
+	// A remembered browser has its own failure count.
+	for i := 0; i < 5; i++ {
+		mine.do("POST", "/api/login", map[string]string{"email": "root@hub", "password": "wrong-password"}, nil)
+	}
+	if code, _ := mine.do("POST", "/api/login", map[string]string{"email": "root@hub", "password": pw}, nil); code != http.StatusTooManyRequests {
+		t.Fatalf("remembered browser after its own failures: want 429, got %d", code)
+	}
+
+	root, err := e.st.UserByEmail(context.Background(), "root@hub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.UpdateUser(context.Background(), root.ID, store.UserUpdate{PassHash: &hash}); err != nil {
+		t.Fatal(err)
+	}
+	if left, _ := e.st.TrustedDevices(context.Background(), root.ID); len(left) != 0 {
+		t.Fatalf("password change kept %d remembered browsers", len(left))
+	}
+}
+
+func TestForgetTrustedDevices(t *testing.T) {
+	e := newEnv(t)
+	jar, _ := cookiejar.New(nil)
+	c := &client{e: e, http: &http.Client{Jar: jar}}
+	if code, _ := c.do("POST", "/api/login", map[string]any{"email": "root@hub", "password": pw, "remember": true}, nil); code != 200 {
+		t.Fatal("login")
+	}
+	var list []struct{ ID int64 }
+	c.do("GET", "/api/me/trusted", nil, &list)
+	if len(list) != 1 {
+		t.Fatalf("want 1 remembered browser, got %d", len(list))
+	}
+	if code, _ := c.do("DELETE", "/api/me/trusted/"+itoa(list[0].ID+100), nil, nil); code != http.StatusNotFound {
+		t.Fatalf("forget a stranger's id: want 404, got %d", code)
+	}
+	if code, _ := c.do("DELETE", "/api/me/trusted", nil, nil); code != http.StatusNoContent {
+		t.Fatalf("forget all: %d", code)
+	}
+	c.do("GET", "/api/me/trusted", nil, &list)
+	if len(list) != 0 {
+		t.Fatalf("left %d remembered browsers", len(list))
+	}
+	// Without remember nothing is stored.
+	c2 := e.login("root@hub")
+	c2.do("GET", "/api/me/trusted", nil, &list)
+	if len(list) != 0 {
+		t.Fatalf("login without remember stored %d browsers", len(list))
+	}
+}
+
 func TestUnauthenticated(t *testing.T) {
 	e := newEnv(t)
 	resp, err := http.Get(e.srv.URL + "/api/tree")
